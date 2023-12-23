@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "RoadTools",
+	"Description": "Road Tools ",
+	"Category": "Other",
+	"CreatedBy": "Kieran Belkus",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "RoadTools",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}
