@@ -2,3 +2,9 @@ Binaries/
 DerivedDataCache/
 Intermediate/
 Saved/
+.idea/
+.vs/
+.vsconfig
+Config/
+Driving.sln
+UpgradeLog.htm
