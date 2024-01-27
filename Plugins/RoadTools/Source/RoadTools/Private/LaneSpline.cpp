@@ -40,7 +40,7 @@ void ALaneSpline::OnConstruction(const FTransform& RootTransform)
 
 
 	LaneStartPosition = LaneSpline->GetLocationAtSplineInputKey(0,ESplineCoordinateSpace::World);
-
+	EditorSplineLength = LaneSpline->GetSplineLength();
 
 }
 

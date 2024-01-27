@@ -18,7 +18,7 @@
 		{
 			"Name": "RoadTools",
 			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "PostEngineInit"
 		}
 	]
 }

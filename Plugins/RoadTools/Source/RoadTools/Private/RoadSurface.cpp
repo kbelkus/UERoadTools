@@ -3,6 +3,8 @@
 
 #include "RoadSurface.h"
 #include "ProceduralMeshComponent.h"
+#include "Landscape.h"
+#include "PlotGenerator.h"
 
 // Sets default values
 ARoadSurface::ARoadSurface()
@@ -12,6 +14,10 @@ ARoadSurface::ARoadSurface()
 
 	RoadSurface = CreateDefaultSubobject<UProceduralMeshComponent>("Road");
 	RoadSurface->SetupAttachment(GetRootComponent());
+
+	LaneMarkingSurface = CreateDefaultSubobject<UProceduralMeshComponent>("LaneMarkings");
+	LaneMarkingSurface->SetupAttachment(GetRootComponent());
+
 
 	CenterSpline = CreateDefaultSubobject<USplineComponent>("CenterSpline");
 	CenterSpline->SetupAttachment(RoadSurface);
@@ -23,6 +29,7 @@ void ARoadSurface::OnConstruction(const FTransform& RootTransform)
 {
 	Super::OnConstruction(RootTransform);
 
+	FlushPersistentDebugLines(GetWorld());
 	//1. Make List of all WayPoints (UserInput atm)
 	//2. Make Edge Vertices (Generate Mesh Points)
 	//3. Set them as vertices
@@ -38,35 +45,78 @@ void ARoadSurface::OnConstruction(const FTransform& RootTransform)
 
 
 
-	if (EditorMode == true)
+	if (EditorMode == true && UseAdvancedRoadDesigner == false)
 	{
 		BuildRoad();
 	}
 	//Create Final Mesh 
 	//RoadSurface->CreateMeshSection(0, VertexPositions, TriangleIndices, TArray<FVector>(), TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>(), true);
 
+	//Use Advanced Road Designer
+	if (UseAdvancedRoadDesigner == true)
+	{
+		//FlushPersistentDebugLines(GetWorld());
+		DrawDebugPoint(GetWorld(), FVector(0,0,0), 10.0f, FColor::Blue, true, -1.0f, 1);
 
+		RoadActorLocation = this->GetActorLocation();
+
+		//For Each Lane, create a mesh
+		int TotalLaneCount = LeftLanes.Num();
+
+		//Clear All Lanes
+		RoadSurface->ClearAllMeshSections();
+		LaneMarkingSurface->ClearAllMeshSections();
+
+
+		for (int i = 0; i < TotalLaneCount; i++)
+		{
+			BuildAdvancedRoad(LeftLanes,i, 0);
+		}
+
+		//For Each Lane, create a mesh
+		TotalLaneCount = RightLanes.Num();
+
+		for (int i = 0; i < TotalLaneCount; i++)
+		{
+			BuildAdvancedRoad(RightLanes,i, LeftLanes.Num());
+		}
+
+
+	}
+
+
+	//DebugDrawVertices();
 
 	if (ProjectSpline == true)
 	{
-	
+		FlushPersistentDebugLines(GetWorld());
 		ProjectSpline = false;
 		ProjectSplinePoints();
+	}
+
+
+
+	//Update Plots If Enabled
+	if (GeneratePlots == true)
+	{
+		UPlotGenerator* PlotComponent = Cast<UPlotGenerator>(GetComponentByClass(UPlotGenerator::StaticClass()));
+		if (PlotComponent)
+		{
+			PlotComponent->GeneratePlotAreas(SplinePointData);
+		}
+
 
 	}
 
 
 
-
 }
+
+
 
 //Trigger this rebuild 
 void ARoadSurface::BuildRoad()
 {
-
-
-
-
 	//Check Intersect Points
 
 	if (EditorMode == true)
@@ -149,6 +199,183 @@ void ARoadSurface::BuildRoad()
 
 }
 
+void ARoadSurface::BuildAdvancedRoad(TArray<FLaneData> Lanes,int LaneIndex, int offset)
+{
+
+	//Make Base Road Mesh each lane is a mesh section to allow for multiple materials
+	PointsAlongSpline(0.0f, CenterSpline->GetSplineLength());
+	GenerateAdvancedMeshPoints(Lanes, LaneIndex);
+	GenerateAdvancedTriangles();
+
+	RoadSurface->CreateMeshSection(LaneIndex + offset, AdvancedVertexPositions, TriangleIndices, TArray<FVector>(), AdvancedVertexUV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	RoadSurface->SetMaterial(LaneIndex + offset, Lanes[LaneIndex].Material);
+	RoadSurface->CastShadow = false;
+
+	//Create Road Markings
+
+	if (CreateLaneMarkings == true)
+	{
+
+
+		//For Each Generate Mesh Points for Lanes Markings
+		//Generate Triangles
+		//Pass to LaneMarkings Proc Mesh Component
+		if (Lanes[LaneIndex].LaneMarkings.Num() == 0)
+		{
+			return;
+		}
+
+		GenerateLaneMarkings(Lanes, LaneIndex);
+		//Create Lane Markings Mesh
+		LaneMarkingSurface->CreateMeshSection(LaneIndex + offset, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), LaneMarkingUVs,TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+		LaneMarkingSurface->SetMaterial(LaneIndex + offset, Lanes[LaneIndex].LaneMarkings[0].MarkingMaterial);
+		LaneMarkingSurface->CastShadow = false;
+	
+	
+	}
+}
+
+
+//Make Lane Markings
+void ARoadSurface::GenerateLaneMarkings(TArray<FLaneData> Lanes, int LaneIndex)
+{
+
+	//
+	const int PointCount = SplinePointData.Num();
+	SplineLength = CenterSpline->GetSplineLength();
+	const float UVIncrement = (SplineLength / 100.0f) / PointCount;
+
+	LaneMarkingVertices.Empty();
+	LaneMarkingUVs.Empty();
+
+	for (int i = 0; i < PointCount; i++)
+	{
+
+
+		TArray<float> Widths; //All Accumilated Widths
+		Widths.Add(0);		  //Center Line
+		float SumWidths = 0.0;
+
+		//Make an array of accumilated point offsets 
+		for (int j = 0; j < Lanes.Num(); j++)
+		{
+			SumWidths = SumWidths + Lanes[j].LaneWidth;
+			Widths.Add(SumWidths);
+
+		}
+
+		//Get First Point  --  INCREMENT EACH MARKING INDEX
+		float P0 = Widths[LaneIndex] + Lanes[LaneIndex].LaneMarkings[0].MarkingOffset; //Lane Start Point
+		float P1 = Widths[LaneIndex] + Lanes[LaneIndex].LaneMarkings[0].MarkingOffset + Lanes[LaneIndex].LaneMarkings[0].MarkingWidth;
+
+
+		FVector CenterPointPosition = SplinePointData[i].Location;
+		FVector NewP0 = (CenterPointPosition + (SplinePointData[i].RightVector * P0)) + FVector(0.0f,0.0f,0.1f);
+		FVector NewP1 = (CenterPointPosition + (SplinePointData[i].RightVector * P1)) + FVector(0.0f, 0.0f, 0.1f);
+
+		LaneMarkingVertices.Add(NewP0);
+		LaneMarkingVertices.Add(NewP1);
+
+
+		//UV Calc
+		float PositionAlongSpline = UVIncrement * i;
+
+		FVector2D UV0 = FVector2D(PositionAlongSpline, 1.0f);
+		LaneMarkingUVs.Add((UV0 * Lanes[LaneIndex].LaneMarkings[0].UVTiling) + Lanes[LaneIndex].LaneMarkings[0].UVOffset);
+		FVector2D UV1 = FVector2D(PositionAlongSpline, 0.0f);
+		LaneMarkingUVs.Add((UV1 * Lanes[LaneIndex].LaneMarkings[0].UVTiling) + Lanes[LaneIndex].LaneMarkings[0].UVOffset);
+
+
+
+	}
+
+
+
+}
+
+
+
+//Overrite this with GenerateMeshPoints
+void ARoadSurface::GenerateAdvancedMeshPoints(TArray<FLaneData> Lanes, int LaneIndex)
+{
+
+	//VertexPositions.Empty();
+
+	const int PointCount = SplinePointData.Num();
+	const int TotalLaneCount = Lanes.Num();
+
+	//Get Length of Spline for UVs
+	SplineLength = CenterSpline->GetSplineLength();
+	const float UVIncrement = (SplineLength / 100.0f) / PointCount;
+
+	UE_LOG(LogTemp, Warning, TEXT("RoadSurface: GenerateAdvancedMeshPoints. SplinePointData is %i"), SplinePointData.Num());
+
+	AdvancedVertexPositions.Empty();
+	AdvancedVertexUV.Empty();
+
+	//For Each Point Along our Main Spline
+	for (int i = 0; i < PointCount; i++)
+	{
+
+		//For Each Spine Index Point
+		//Get our Lane Index
+		//for our index count, accumulate the widths we need
+		//start = lanes[index - 1]
+
+
+		TArray<float> Widths; //All Accumilated Widths
+		Widths.Add(0);		  //Center Line
+		float SumWidths = 0.0;
+
+		//Make an array of accumilated point offsets 
+		for (int j = 0; j < Lanes.Num(); j++)
+		{
+			SumWidths = SumWidths + Lanes[j].LaneWidth;
+			Widths.Add(SumWidths);
+
+		}
+
+		//Get First Point
+		float P0 = Widths[LaneIndex];
+		float P1 = Widths[LaneIndex + 1];
+
+		float StartPoint = FMath::Min(P0, P1);
+		float EndPoint	 = FMath::Max(P0, P1);
+
+		// --
+		// Insert Lerped Points here for lane resolution
+
+
+		//Resolve our WorldSpace Data
+		FVector CenterPointPosition = SplinePointData[i].Location;
+		FVector NewP0 = (CenterPointPosition + (SplinePointData[i].RightVector * StartPoint)) - RoadActorLocation;
+		FVector NewP1 = (CenterPointPosition + (SplinePointData[i].RightVector * EndPoint)) - RoadActorLocation;
+
+		AdvancedVertexPositions.Add(NewP0);
+		AdvancedVertexPositions.Add(NewP1);
+
+
+		//For Each Vertex we add, add a uv. Left = y - 1 Right - y = 0. X is Position Along our Spline
+		float PositionAlongSpline = UVIncrement * i;
+
+		FVector2D UV0 = FVector2D(PositionAlongSpline, 1.0f);
+		AdvancedVertexUV.Add((UV0 * Lanes[LaneIndex].UVTiling) + Lanes[LaneIndex].UVOffset);
+		FVector2D UV1 = FVector2D(PositionAlongSpline, 0.0f);
+		AdvancedVertexUV.Add((UV1 * Lanes[LaneIndex].UVTiling) + Lanes[LaneIndex].UVOffset);
+
+		// End of Loop
+	}
+
+	ProfileVertexCount = LeftLanes.Num() + RightLanes.Num();
+
+	UE_LOG(LogTemp, Warning, TEXT("RoadSurface: GenerateAdvancedMeshPoints. Vertex Count is %i"),AdvancedVertexPositions.Num());
+
+	
+	//Editor Debug
+
+
+}
+
 
 
 //Genate Array of all our Points here
@@ -181,6 +408,51 @@ void ARoadSurface::GenerateMeshPoints()
 	}
 	return;
 }
+
+void ARoadSurface::GenerateAdvancedTriangles()
+{
+	TriangleIndices.Empty();
+
+	//We need to go through all our vertex positions and generate triangles - its a bit anoying we need to use a formula to always generate clean quads
+	//Right now - we generate one quad per road point - so each roadpoint requires SIX indices = roadPoints.Num * 6
+
+	int vertexCount = VertexPositions.Num();
+	int pointCount = SplinePositions.Num();  // RoadPoints.Num();
+
+	int widthPoints = 2;
+
+	int rootIndex = 0;
+
+	//Each Step Along Road 
+	for (int i = 0; i < pointCount; i++)
+	{
+
+		for (int j = 0; j < (widthPoints - 1); j++)
+		{
+			//FIRST TRIANGLE
+			int first = (rootIndex + j);
+			int second = (rootIndex + j) + 1;
+			int third = (rootIndex + j) + widthPoints;
+
+			TriangleIndices.Add(first);
+			TriangleIndices.Add(second);
+			TriangleIndices.Add(third);
+
+			//SECOND TRIANGLE
+			int fourth = (rootIndex + j) + 1;
+			int fifth = (rootIndex + j) + (widthPoints + 1);
+			int sixth = (rootIndex + j) + widthPoints;
+
+			TriangleIndices.Add(fourth);
+			TriangleIndices.Add(fifth);
+			TriangleIndices.Add(sixth);
+		}
+		rootIndex = i * widthPoints;
+	}
+	return;
+}
+
+
 
 //Generate all our Triangles Indices here
 void ARoadSurface::GenerateTriangles()
@@ -235,12 +507,14 @@ void ARoadSurface::PointsAlongSpline(float StartDistance, float EndDistance)
 	FVector RoadWorldSpaceOffset = this->GetTransform().GetLocation();
 
 	//Clear our Arrays
-	SplinePositions.Empty();
-	RoadPointNormal.Empty();
-	RoadPointTangent.Empty();
+	SplinePositions.Empty();  //V1
+	RoadPointNormal.Empty();  //V1
+	RoadPointTangent.Empty(); //V1
+
+	SplinePointData.Empty();  //V2
 
 	//Spline Resolution should be Resolution over Distance
-	float SplineLength = CenterSpline->GetSplineLength();
+	 SplineLength = CenterSpline->GetSplineLength();
 	//Number of Points we need to make
 	int SplineDensity = int(SplineLength / LengthResolution);
 	//Distance Between Each Point
@@ -265,6 +539,7 @@ void ARoadSurface::PointsAlongSpline(float StartDistance, float EndDistance)
 			break;
 		}
 
+
 		FVector WorldLocation = CenterSpline->GetWorldLocationAtDistanceAlongSpline(t);
 		FVector WorldNormal = CenterSpline->GetWorldDirectionAtDistanceAlongSpline(t);
 		FVector WorldTangent = CenterSpline->GetRightVectorAtDistanceAlongSpline(t, ESplineCoordinateSpace::World);
@@ -273,9 +548,36 @@ void ARoadSurface::PointsAlongSpline(float StartDistance, float EndDistance)
 		RoadPointNormal.Add(WorldNormal);
 		RoadPointTangent.Add(WorldTangent);
 
+
+		//V2 
+		FSampledSplinePoint NewPoint;
+		NewPoint.Location = WorldLocation;
+		NewPoint.RightVector = WorldTangent;
+		NewPoint.Normal = WorldNormal;
+
+		SplinePointData.Add(NewPoint);
+		
+		// END V2
+
+
 	}
 
 	//Add Final Point Here
+
+}
+
+void ARoadSurface::DebugDrawVertices()
+{
+
+	if (AdvancedVertexPositions.Num() != 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RoadSurface: DebugDrawVertices Drawing Verts"));
+
+		for (int i = 0; i < AdvancedVertexPositions.Num(); i++)
+		{
+			DrawDebugPoint(GetWorld(), AdvancedVertexPositions[i], 20.0f, FColor::Blue, true, -1.0f, 10);
+		}
+	}
 
 }
 
@@ -292,20 +594,48 @@ void ARoadSurface::ProjectSplinePoints()
 	//For Each Point in our Spline, project it down until it hits something
 	for (int i = 0; i < CenterSpline->GetNumberOfSplinePoints(); i++)
 	{
-		FHitResult HitResult;
+		FHitResult UpHitResult;
+		FHitResult DownHitResult;
 		FCollisionQueryParams CollisionParams;
 		FCollisionObjectQueryParams ObjectParams;
 
 		TEnumAsByte<ECollisionChannel> TraceChannelProperty = ECC_WorldStatic;
 
-		FVector StartLocation = CenterSpline->GetWorldLocationAtSplinePoint(i) - FVector(0,0,-50.0f);
-		FVector EndLocation = StartLocation + (FVector(0, 0, -1) * 5000.0f);
 
 
-		bool bHit = GetWorld()->LineTraceSingleByObjectType(HitResult,StartLocation, EndLocation, ObjectParams, CollisionParams);
+		FVector StartLocation = CenterSpline->GetWorldLocationAtSplinePoint(i) - FVector(0,0,-1.0f);
+		FVector DownLocation = StartLocation + (FVector(0, 0, -1) * 10000.0f);
+		FVector UpLocation   = StartLocation + (FVector(0, 0, 1) * 10000.0f);
 
-		//if(Hi)
+		//bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, RayStartPosition, EndLocation, ECC_WorldDynamic, CollisionParms);
 
+		bool bHitDown = GetWorld()->LineTraceSingleByObjectType(DownHitResult,StartLocation, DownLocation, ECC_WorldStatic, CollisionParams);
+		bool bHitUp = GetWorld()->LineTraceSingleByObjectType(UpHitResult, StartLocation, UpLocation, ECC_WorldStatic, CollisionParams);
+
+		DrawDebugLine(GetWorld(), StartLocation, DownLocation, FColor::Red, true, 10.0f, 10, 10.0f);
+
+		FVector ResultLocation = CenterSpline->GetWorldLocationAtSplinePoint(i);
+
+		
+		if (bHitDown)
+		{
+			AActor* HitActor =  DownHitResult.GetActor();
+
+			ResultLocation = DownHitResult.Location;
+
+			if (HitActor)
+			{
+					ResultLocation = DownHitResult.Location;
+			}
+
+
+			DrawDebugSphere(GetWorld(), ResultLocation, 10.0f, 32, FColor::Green, true, 2.0f, 1, 1.0f);
+
+			UE_LOG(LogTemp, Warning, TEXT("RoadSurface: Project To Terrain, %s"), *ResultLocation.ToString());
+			CenterSpline->SetLocationAtSplinePoint(i, ResultLocation + FVector(0.0f,0.0f,0.2f), ESplineCoordinateSpace::World, true);
+
+		}
+		
 
 
 	}
@@ -314,6 +644,9 @@ void ARoadSurface::ProjectSplinePoints()
 
 
 }
+
+
+
 
 
 

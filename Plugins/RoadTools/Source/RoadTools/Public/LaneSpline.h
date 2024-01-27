@@ -68,7 +68,9 @@ public:
 	bool isJunctionLane;
 	UPROPERTY(EditAnywhere)
 	USplineComponent* LaneSpline;
-	
+
+	UPROPERTY(EditAnywhere)
+	float EditorSplineLength;
 
 	USplineComponent* ReturnSpline() const { return LaneSpline; }
 
