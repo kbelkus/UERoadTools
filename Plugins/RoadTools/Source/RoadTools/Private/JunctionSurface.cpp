@@ -254,6 +254,15 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 }
 
 
+//Generate an Axis Aligned Bounds
+FVector AJunctionSurface::GenerateJunctionBounds()
+{
+
+
+	return FVector(0, 0, 0);
+
+}
+
 void AJunctionSurface::DrawVertices(TArray<FVector>Vertices)
 {
 
@@ -501,7 +510,7 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 		TArray<int> Triangles = ReturnTriangleIndicesGrid(JunctionSectionPoints, SortedPointCount, false);
 
 		JunctionCenterSurface->CreateMeshSection(i, JunctionSectionPoints, Triangles, TArray<FVector>(), TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>(), true);
-
+		JunctionCenterSurface->SetMaterial(i,JunctionSurfaceMaterial);
 
 	}
 
@@ -513,7 +522,7 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 	TArray<int>JunctionCenterTriangles = ReturnTriangleIndicesFan(InnerMostPoints, InnerMostPoints.Num(), false);
 
 	JunctionCenterSurface->CreateMeshSection(JunctionCenterIndex, InnerMostPoints, JunctionCenterTriangles, TArray<FVector>(), TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>(), true);
-
+	JunctionCenterSurface->SetMaterial(JunctionCenterIndex, JunctionSurfaceMaterial);
 
 	//CREATE OUR CORNER Flange Geo Bits To make Junction look better
 	for (int i = 0; i < IntersectCornerPoints.Num(); i++)
@@ -537,13 +546,14 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 		TArray<int> Triangles = ReturnTriangleIndicesFan(BezierPoints, 0, false);
 		
 		//ADD DEBUG TOGGLE HERE
-		//for (int j = 0; j < IntersectCornerPoints[i].Location.Num(); j++)
+		for (int j = 0; j < BezierPoints.Num(); j++)
 		//{
-		//	DrawDebugPoint(GetWorld(), IntersectCornerPoints[i].Location[j], 20.0f, JunctionColorCodes[i], true, -1.0, 4);
+		//	DrawDebugPoint(GetWorld(), BezierPoints[j], 20.0f, JunctionColorCodes[i], true, -1.0, 4);
 
 		//}
 
 		JunctionCenterSurface->CreateMeshSection(JunctionCenterIndex + (1 + i ), BezierPoints, Triangles, TArray<FVector>(), TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+		JunctionCenterSurface->SetMaterial(JunctionCenterIndex + (1 + i), JunctionSurfaceMaterial);
 
 	}
 
@@ -700,18 +710,18 @@ TArray<int> AJunctionSurface::ReturnTriangleIndicesFan(TArray<FVector> Vertices,
 	{
 
 		//Each Step Along Road 
-		for (int i = 0; i < pointCount - 1; i++)
+		for (int i = 0; i < pointCount; i++)
 		{
 
-			if (i == RootPointIndex)
-			{
-				continue;
-			}
+			//if (i == RootPointIndex)
+			//{
+			//	continue;
+			//}
 
 
 			int first = RootPointIndex;
 			int second = i;
-			int third = (i + 1) % (pointCount - 1);
+			int third = (i + 1) % (pointCount);
 
 			Indices.Add(first);
 			Indices.Add(second);

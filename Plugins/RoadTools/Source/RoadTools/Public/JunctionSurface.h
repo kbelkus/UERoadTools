@@ -401,6 +401,9 @@ protected:
 	FVector LineIntersection(FVector PointAStart, FVector PointAEnd, FVector PointBStart, FVector PointBEnd);
 	//UFUNCTION()
 	//void CreateLaneMarkings();
+	UFUNCTION()
+	FVector GenerateJunctionBounds();
+
 
 	UFUNCTION()
 	void DrawVertices(TArray<FVector>Vertices);
@@ -456,6 +459,10 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TArray<FJunctionCapCornerPoints> IntersectCornerPoints; //the three points which make up the 'triangle' for the junction corner piece
 
+	FVector JunctionBoundingBox;
+
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* JunctionSurfaceMaterial;
 
 	//Properties That are Set by RoadManager
 	UPROPERTY(EditAnywhere)

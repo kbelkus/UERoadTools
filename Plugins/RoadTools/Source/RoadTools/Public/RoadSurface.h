@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Materials/MaterialInterface.h"
 #include "GameFramework/Actor.h"
 #include "Components/SplineComponent.h"
 #include "RoadSurface.generated.h"
@@ -66,7 +67,7 @@ struct FLaneData
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* Material;
 	UPROPERTY(EditAnywhere)
-	FVector2D UVTiling = FVector2D(1.0f,1.0f);
+	FVector2D UVTiling = FVector2D(0.3f,1.0f);
 	UPROPERTY(EditAnywhere)
 	FVector2D UVOffset = FVector2D(0.0f,0.0f);
 	UPROPERTY(EditAnywhere)
@@ -74,6 +75,7 @@ struct FLaneData
 
 	FLaneData()
 	{
+		Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Road_Surface_Master_Inst.Road_Surface_Master_Inst"));
 
 	}
 };

@@ -22,7 +22,7 @@ void UPlotGenerator::GeneratePlotAreas(TArray<FSampledSplinePoint> SplinePointDa
 
 	PlotIndexPoint.Empty();
 
-	for (int i = 0; i < SplinePointData.Num(); i += 10)
+	for (int i = 0; i < SplinePointData.Num(); i += 5)
 	{
 
 		if (i > SplinePointData.Num())
