@@ -243,7 +243,7 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 
 		//CREATE INTERIOR JUNCTION POINTS
 		ManualEditBuildCenterGeo();
-
+		ManualEditBuildGenterMarkings();
 
 		//CREATE LANE MARKINGS
 
@@ -257,22 +257,16 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 //Generate an Axis Aligned Bounds
 FVector AJunctionSurface::GenerateJunctionBounds()
 {
-
-
 	return FVector(0, 0, 0);
-
 }
 
 void AJunctionSurface::DrawVertices(TArray<FVector>Vertices)
 {
-
 	for (int i = 0; i < Vertices.Num(); i++)
 	{
 		DrawDebugPoint(GetWorld(), Vertices[i], 10.0f, FColor::Magenta, true, -1.0f, 3);
 	}
-
 }
-
 
 
 void AJunctionSurface::ManualEditBuildCenterGeo()
@@ -285,10 +279,8 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 	//First Get Order of our Incoming Junction Roads
 	TArray<FJunctionOrder> JunctionOrder;
 
-
 	//Solve Angle From Center for all our cap points
 	ManualEditPointsAngleFromCenter();
-
 
 	//Go Through and just Isolate Edge Points
 	TArray<FCapPoints> JunctionCapEdgePoints;
@@ -323,30 +315,17 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 
 		FVector PointAStart = JunctionCapEdgePoints[i].Location;
 		FVector PointAEnd = JunctionCapEdgePoints[i].Location + (JunctionCapEdgePoints[i].ForwardVector * -10000.0f);
-		
 		FVector PointBStart = JunctionCapEdgePoints[NextPointIndex].Location;
 		FVector PointBEnd = JunctionCapEdgePoints[NextPointIndex].Location + (JunctionCapEdgePoints[NextPointIndex].ForwardVector * -10000.0f);
-
 		FVector IntersectPoint = LineIntersection(PointAStart, PointAEnd, PointBStart, PointBEnd);
-
 
 		//Check Intersect Point 0 length means line intersct could not be found.
 		if (IntersectPoint.Length() == 0)
 		{
-
 			//Find Halfway Point
 			FVector HalfwayPoint = FMath::Lerp(PointAStart, PointBStart, 0.5f);
-
 			IntersectPoint = HalfwayPoint;
-
-
 		}
-
-		//DrawDebugPoint(GetWorld(), PointAStart, 40.0f, FColor::Red, true, -1.0f, 10.0);
-		//DrawDebugPoint(GetWorld(), PointAEnd, 40.0f, FColor::Blue, true, -1.0f, 10.0);
-		//DrawDebugPoint(GetWorld(), PointBStart, 40.0f, FColor::Green, true, -1.0f, 10.0);
-		//DrawDebugPoint(GetWorld(), PointBEnd, 40.0f, FColor::Yellow, true, -1.0f, 10.0);
-		//DrawDebugPoint(GetWorld(), IntersectPoint, 40.0f, FColor::Magenta, true, -1.0f, 10.0);
 
 		float IntersectDistanceFirstPoint = FVector::Distance(PointAStart, IntersectPoint);
 		float IntersectDistanceSecondPoint = FVector::Distance(PointBStart, IntersectPoint);
@@ -361,7 +340,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 		P0.IntersectDistance = IntersectDistanceFirstPoint;
 		P0.ForwardVector = JunctionCapEdgePoints[i].ForwardVector;
 		
-
 		FIntersectPoints P1;
 		P1.Location = IntersectPoint;
 		P1.IntersectedPointID = JunctionCapEdgePoints[NextPointIndex].PointID;
@@ -372,7 +350,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 
 		FoundIntersectPoints.Add(P0);
 		FoundIntersectPoints.Add(P1);
-
 
 		//Apply The same three points to another array, so we can use this to create our edge geo later
 		//Apply in a specific order which makes 
@@ -405,8 +382,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 			}
 
 			return PointA.PointType < PointB.PointType;
-
-
 	});
 
 
@@ -414,10 +389,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 	//Distance for each corner can be different. So for each middle point we need to find offset by lerping between our two offsets.
 	//
 	// NOTES: for all our endcap points. Try sort our points by angle and then ID? 
-	//
-	//
-	//
-	//
 
 	//Apply U Value to all Junction Points
 	//Also apply offset value based on lerp(leftPDistance, rightPDistance, UValue)
@@ -474,16 +445,14 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 		CurrentJunctionPoints = JunctionIDSortedPoints[i];
 
 		CurrentJunctionPoints.Points.Sort([](const FCapPoints& PointA, const FCapPoints& PointB)
-			{
+		{
 				return PointA.UValue < PointB.UValue;
-
-			});
+		});
 
 
 		for (int j = 0; j < SortedPointCount; j++)
 		{
 			JunctionSectionPoints.Add(CurrentJunctionPoints.Points[j].Location);
-
 		}
 
 		for (int j = 0; j < SortedPointCount; j++)
@@ -495,8 +464,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 			FVector OffsetPosition = SortedPointLocation + (-Direction * Distance);
 
 			JunctionSectionPoints.Add(OffsetPosition);
-
-			//DrawDebugPoint(GetWorld(), OffsetPosition, 20.0f, FColor::Green, true, -1.0, 4);
 
 			//Add all our inner most points to their own list
 			InnerMostPoints.Add(OffsetPosition);
@@ -541,12 +508,19 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 			//DrawDebugPoint(GetWorld(), BezierCurveLocation, 20.0f, FColor::White, true, -1.0, 4);
 		}
 
+		//Put these points into their own array so we can reuse them for the edge lane markings and save recomputing all this junk
+		FBezierCornerPoints CurrentBezierPoints;
+		CurrentBezierPoints.CornerID = i;
+		CurrentBezierPoints.Position.Append(BezierPoints);
+
+		BezierEdgePoints.Add(CurrentBezierPoints);
+
 		//Our Points are all in a specific order set by a previous function
 		// 0 = Start 1 = Corner 2 = Middle
 		TArray<int> Triangles = ReturnTriangleIndicesFan(BezierPoints, 0, false);
 		
 		//ADD DEBUG TOGGLE HERE
-		for (int j = 0; j < BezierPoints.Num(); j++)
+		//for (int j = 0; j < BezierPoints.Num(); j++)
 		//{
 		//	DrawDebugPoint(GetWorld(), BezierPoints[j], 20.0f, JunctionColorCodes[i], true, -1.0, 4);
 
@@ -560,6 +534,106 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 }
 
 
+//Build the inner most lane markings 
+void AJunctionSurface::ManualEditBuildGenterMarkings()
+{
+
+
+	//Get our Edge Points but get the next one along - so we get the inner most lane
+	//Assume therefore the outer lane will always be nondrivable
+	TArray<FCapPoints> JunctionCapEdgePoints;
+	for (int i = 0; i < JunctionCapPoints.Num(); i++)
+	{
+
+		if (JunctionCapPoints[i].PointType == -1)
+		{
+			int NextPointIndex = (i - 1) % JunctionCapPoints.Num();
+			JunctionCapEdgePoints.Add(JunctionCapPoints[NextPointIndex]);
+			DrawDebugPoint(GetWorld(), JunctionCapPoints[NextPointIndex].Location, 20.0f, FColor::Red, true, -1.0, 5);
+		}
+
+		if (JunctionCapPoints[i].PointType == 1)
+		{
+			int NextPointIndex = (i + 1) % JunctionCapPoints.Num();
+			JunctionCapEdgePoints.Add(JunctionCapPoints[NextPointIndex]);
+			DrawDebugPoint(GetWorld(), JunctionCapPoints[NextPointIndex].Location, 20.0f, FColor::Green, true, -1.0, 5);
+		}
+	}
+
+	//With these points now do our intersect to make some new points for the outer most marking
+
+	//Calculate Normals
+	for (int i = 0; i < BezierEdgePoints.Num(); i++)
+	{
+		TArray<FVector> Normals;
+
+		for (int j = 0; j < BezierEdgePoints[i].Position.Num() - 1; j++)
+		{
+
+			FVector Normal = BezierEdgePoints[i].Position[j] - BezierEdgePoints[i].Position[j + 1];
+
+			if (j == BezierEdgePoints[i].Position.Num() - 1)
+			{
+				Normal = BezierEdgePoints[i].Position[j - 1] - BezierEdgePoints[i].Position[j];
+			}
+
+			Normals.Add(Normal);
+
+		}
+
+		BezierEdgePoints[i].Normal.Append(Normals);
+
+	}
+
+
+
+
+	//Draw all our Points <--- MERGE THIS INTO LOOP ABOVE
+	for (int i = 0; i < BezierEdgePoints.Num() - 1; i++)
+	{
+
+		FlushPersistentDebugLines(GetWorld());
+
+		for (int j = 0; j < BezierEdgePoints[i].Position.Num() - 1; j++)
+		{
+
+			FVector BaseLocation = BezierEdgePoints[i].Position[j];
+			FVector RightVector = FVector::CrossProduct(BezierEdgePoints[i].Normal[j], FVector(0, 0, 1));
+			RightVector.Normalize();
+
+			float OffsetDistance = -100.0f;
+
+			FVector OffsetLocation = BaseLocation + (RightVector * OffsetDistance);
+
+			DrawDebugPoint(GetWorld(), OffsetLocation, 20.0f, FColor::Purple, true, -1.0, 5);
+
+
+		}
+	}
+
+
+	//Corner Marking Geo
+	for (int i = 0; i < JunctionPoints.Num(); i++)
+	{
+
+
+
+
+
+
+
+
+
+
+
+	}
+
+
+
+}
+
+
+
 FVector AJunctionSurface::LineIntersection(FVector PointAStart, FVector PointAEnd, FVector PointBStart, FVector PointBEnd)
 {
 
@@ -568,7 +642,6 @@ FVector AJunctionSurface::LineIntersection(FVector PointAStart, FVector PointAEn
 
 	float s;
 	float t;
-
 
 	s = (-s1.Y * (PointAStart.X - PointBStart.X) + s1.X * (PointAStart.Y - PointBStart.Y)) / (-s2.X * s1.Y + s1.X * s2.Y);
 	t = (s2.X * (PointAStart.Y - PointBStart.Y) - s2.Y * (PointAStart.X - PointBStart.X)) / (-s2.X * s1.Y + s1.X * s2.Y);

@@ -47,7 +47,23 @@ struct FJunctionLaneData
 };
 
 
+USTRUCT()
+struct FBezierCornerPoints
+{
+	GENERATED_BODY()
 
+	UPROPERTY()
+	int CornerID;
+	UPROPERTY()
+	TArray<FVector> Position;
+	UPROPERTY()
+	TArray<FVector> Normal;
+
+	FBezierCornerPoints()
+	{
+	}
+
+};
 
 USTRUCT() //DEP
 struct FJunctionRoadProperties
@@ -403,6 +419,8 @@ protected:
 	//void CreateLaneMarkings();
 	UFUNCTION()
 	FVector GenerateJunctionBounds();
+	UFUNCTION()
+	void ManualEditBuildGenterMarkings();
 
 
 	UFUNCTION()
@@ -458,7 +476,8 @@ public:
 	TArray<FJunctionIDPoints> JunctionIDSortedPoints;
 	UPROPERTY(VisibleAnywhere)
 	TArray<FJunctionCapCornerPoints> IntersectCornerPoints; //the three points which make up the 'triangle' for the junction corner piece
-
+	UPROPERTY(EditAnywhere)
+	TArray<FBezierCornerPoints> BezierEdgePoints;
 	FVector JunctionBoundingBox;
 
 	UPROPERTY(EditAnywhere)
