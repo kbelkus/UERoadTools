@@ -9,6 +9,26 @@
 
 class UProceduralMeshComponent;
 
+UENUM(BlueprintType)
+enum class ELaneTurningOptioms : uint8
+{
+	ALL = 0 UMETA(DisplayName = "Any"),
+	LEFT = 1  UMETA(DisplayName = "Left Only"),
+	LEFTFORWARD = 2     UMETA(DisplayName = "Left and Forward"),
+	FORWARD = 3 UMETA(DisplayName = "Forward Only"),
+	FORWARDRIGHT = 4 UMETA(DisplayName = "Forward and Right"),
+	RIGHT = 5 UMETA(DisplayName = "Right Only"),
+};
+
+UENUM(BlueprintType)
+enum class ELaneDrivingType : uint8
+{
+	NONE = 0 UMETA(DisplayName = "None"),
+	DRIVING = 1  UMETA(DisplayName = "Driving"),
+	SHOULDER = 2     UMETA(DisplayName = "Shoulder"),
+	BICYCLE = 3 UMETA(DisplayName = "Bicycle"),
+};
+
 
 
 //Input Road Lane Data -- should match our data from ARoadSurface 
@@ -39,6 +59,10 @@ struct FJunctionLaneData
 	FVector2D UVOffset = FVector2D(0.0f, 0.0f);
 	UPROPERTY(EditAnywhere)
 	TArray<FLaneMarking> LaneMarkings;
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
 
 	FJunctionLaneData()
 	{
@@ -47,17 +71,85 @@ struct FJunctionLaneData
 };
 
 
+//Use this for marking where a turning lane starts and ends
+USTRUCT()
+struct FJunctionTurningLanePoint
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere)
+	FVector Location;
+	UPROPERTY(VisibleAnywhere)
+	int JunctionID;
+	UPROPERTY(VisibleAnywhere)
+	int LaneID;
+	UPROPERTY(VisibleAnywhere)
+	int LaneDirection; //0 = Forward 1 = Backwards (This is so we can automatically mark the driving direction)
+	UPROPERTY(VisibleAnywhere)
+	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	UPROPERTY(VisibleAnywhere)
+	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
+	UPROPERTY(VisibleAnywhere)
+	FVector ForwardVector;
+
+	FJunctionTurningLanePoint()
+	{
+
+	}
+};
+
+USTRUCT()
+struct FJunctionTurningLane
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere)
+	int TurningLaneID;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FVector> TurningLanePoints;
+
+	FJunctionTurningLane()
+	{
+
+	}
+};
+
+
+
+USTRUCT()
+struct FTurningLaneConnections
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FJunctionTurningLanePoint StartPoint;
+	UPROPERTY()	
+	TArray<FJunctionTurningLanePoint> EndPoints;
+
+	FTurningLaneConnections()
+	{
+
+	}
+
+};
+
+
+
 USTRUCT()
 struct FBezierCornerPoints
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	int CornerID;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	TArray<FVector> Position;
-	UPROPERTY()
+	UPROPERTY(VisibleAnywhere)
 	TArray<FVector> Normal;
+	UPROPERTY(VisibleAnywhere)
+	int StartJunctionID;
+	UPROPERTY(VisibleAnywhere)
+	int EndJunctionID;
 
 	FBezierCornerPoints()
 	{
@@ -220,6 +312,8 @@ struct FJunctionCapCornerPoints
 	TArray<FVector> Location;
 	UPROPERTY(VisibleAnywhere)
 	TArray<int> PointID;
+	UPROPERTY(VisibleAnywhere)
+	TArray<int> JunctionIDs; //Original Junction IDs
 
 	FJunctionCapCornerPoints()
 	{
@@ -252,6 +346,14 @@ struct FCapPoints
 	float OffsetDistance;
 	UPROPERTY(VisibleAnywhere)
 	float UValue;
+	UPROPERTY()
+	float Offset = 0.0;
+	UPROPERTY()
+	int LaneDirection = 0; //Write data into here for the direction of the lane - since we use this for turning lane points 
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
 
 	FCapPoints()
 	{
@@ -377,7 +479,7 @@ protected:
 	FVector JunctionCenter;
 
 	//Preset Vars
-	TArray<FColor> JunctionColorCodes = { FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Turquoise, FColor::Orange, FColor::Emerald, FColor::Magenta, FColor::White, FColor::Black, FColor::Purple, FColor::Silver, FColor::Yellow };
+	TArray<FColor> JunctionColorCodes = { FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Turquoise, FColor::Orange, FColor::Magenta, FColor::Emerald, FColor::White, FColor::Black, FColor::Purple, FColor::Silver, FColor::Yellow };
 
 	//Functions
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -421,7 +523,8 @@ protected:
 	FVector GenerateJunctionBounds();
 	UFUNCTION()
 	void ManualEditBuildGenterMarkings();
-
+	UFUNCTION()
+	void CreateTurningLanePoints();
 
 	UFUNCTION()
 	void DrawVertices(TArray<FVector>Vertices);
@@ -458,6 +561,11 @@ public:
 	UPROPERTY(EditAnywhere)
 	bool LaneMarkings = false;
 	UPROPERTY(EditAnywhere)
+	bool DrawLaneConnections = false;
+	UPROPERTY(EditAnywhere)
+	int DebugLaneConnectionID = 0;
+
+	UPROPERTY(EditAnywhere)
 	TArray<FJunctionPoint> JunctionInputRoads;
 	UPROPERTY()
 	FVector JunctionWorldLocation = FVector(0,0,0);
@@ -479,6 +587,15 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FBezierCornerPoints> BezierEdgePoints;
 	FVector JunctionBoundingBox;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FJunctionTurningLanePoint> TurningLanePoints;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FTurningLaneConnections> TurningLaneConnections;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FCapPoints> JunctionCenterLineEndPoint;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FJunctionTurningLane> TurningLanes; //Should we keep a reference to our ALaneSpline here?
+
 
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* JunctionSurfaceMaterial;
