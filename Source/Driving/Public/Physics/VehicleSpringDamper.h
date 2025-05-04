@@ -6,6 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "VehicleSpringDamper.generated.h"
 
+class ALaneSpline;
+class USplineComponent;
+
 UCLASS()
 class DRIVING_API AVehicleSpringDamper : public AActor
 {
@@ -15,6 +18,12 @@ public:
 	// Sets default values for this actor's properties
 	AVehicleSpringDamper();
 
+	//Components
+	TObjectPtr<UStaticMeshComponent> BodyMesh;
+
+	TArray<TObjectPtr<UStaticMeshComponent>> WheelMeshes;
+
+
 	UPROPERTY(EditAnywhere)
 	TArray<FVector> WheelOffset = { FVector(150,100,0), FVector(150,-100,0), FVector(-150,100,0), FVector(-150,-100,0) };
 
@@ -23,10 +32,16 @@ public:
 
 	//Suspension
 	UPROPERTY(EditAnywhere)
-	float MaxSuspesionLength = 150.0f;
+	float MaxSuspesionLength = 100.0f;
 
 	UPROPERTY(EditAnywhere)
-	float VehicleMass = 1000.0f;
+	float VehicleMass = 2000.0f;
+
+	UPROPERTY(EditAnywhere)
+	float WheelRadius = 50.0f;
+
+	UPROPERTY(EditAnywhere)
+	float SuspensionOffset = 0.0f;
 
 	//UPROPERTY(EditAnywhere)
 	//float SuspensionMultiplier = 12000.0f;
@@ -43,23 +58,93 @@ public:
 	
 	//NewTest
 	UPROPERTY(EditAnywhere)
-	float RestLength = 200.0f;
+	float RestLength = 100.0f;
 
 	UPROPERTY(EditAnywhere)
-	float SpringStiffness = 5000.0f;
+	float SpringStiffness = 2000.0f;
 
 	UPROPERTY(EditAnywhere)
-	float DampingCoefficient = 800.0f;
+	float DampingCoefficient = 2000.0f;
+
+	UPROPERTY(EditAnywhere)
+	float IntertialTensorScale = 100.0f;
 
 	FVector VehicleVelocity;
+	FVector VehicleAngularVelocity;
 
+	UPROPERTY(EditAnywhere)
+	FVector InertialTensor = FVector(1.0f, 1.0f, 1.0f); // tweak manually
+
+	FQuat ActorRotation;
+
+	UPROPERTY(EditAnywhere)
+	FVector CalculatedCOM;
+
+	//DEBUG CONTROLS
+	UPROPERTY(EditAnywhere)
+	FVector BoxExtents = FVector(300, 200, 180);
+
+	UPROPERTY(EditAnywhere)
+	FVector BoxLocation = FVector(0, 0, 0);
+
+	UPROPERTY(EditAnywhere)
+	bool ApplyLocomotion = false;
+
+	UPROPERTY(EditAnywhere)
+	float MaxSpeed = 10.0f;
+
+	UPROPERTY(EditAnywhere)
+	float VehicleAcc = 1.0f;
+
+	//TEMP Get Spline
+	UPROPERTY(EditAnywhere)
+	bool bUseSpline;
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<ALaneSpline> OptionalLaneSpline;
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<USplineComponent> ActiveSplineComponent;
+
+	UPROPERTY(EditAnywhere)
+	float SplineDelta;
+
+	UPROPERTY(EditAnywhere)
+	FTransform SplineTransform;
+
+	//Speed Delta
+	UPROPERTY(EditAnywhere)
+	FVector PreviousLocation;
+	
+	UPROPERTY(EditAnywhere)
+	float CurrentSpeed;
+
+	float WheelCircumference;
+
+	UPROPERTY(EditAnywhere)
+	float TempSteerAngle;
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void OnConstruction(const FTransform& Transform) override;
+
+	UFUNCTION()
+	FTransform GetPositionAlongSpline(float InSplineDelta, FTransform& OutTargetTransform);
+
+	UFUNCTION()
+	void UpdateWheelRotations(float InSpeedDelta, FTransform InSteeringTarget, float DeltaTime, FVector InVehicleForwarDirection, FVector InVehicleLocation);
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+	//Input Meshes
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<UStaticMesh> InputBodyMesh;
+
+	UPROPERTY(BlueprintReadWrite,EditAnywhere)
+	TObjectPtr<UStaticMesh> WheelMesh;
+	
 };
