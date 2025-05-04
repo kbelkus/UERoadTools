@@ -8,6 +8,41 @@
 #include "LaneSpline.h"
 #include "BaseTrafficVehicle.generated.h"
 
+class UTrafficWheelComponent;
+
+USTRUCT()
+struct FWheelData
+{
+
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<UTrafficWheelComponent> WheelComponent = nullptr;
+	
+	UPROPERTY(EditAnywhere)
+	float CurrentCompression = 0.0f;
+
+	UPROPERTY(EditAnywhere)
+	float PreviousCompression = 0.0f;
+	
+	UPROPERTY(EditAnywhere)
+	float Velocity = 0.0f;
+
+	UPROPERTY(EditAnywhere)
+	float RestLength = 200.0f;
+
+	UPROPERTY(EditAnywhere)
+	float MaxLength = 250.0f;
+
+	UPROPERTY(EditAnywhere)
+	float SuspensionStiffness = 200000.0f;
+
+	UPROPERTY(EditAnywhere)
+	float SuspensionDamping = 4000.0f;
+
+};
+
+
 UCLASS()
 class DRIVING_API ABaseTrafficVehicle : public AActor
 {
@@ -16,6 +51,8 @@ class DRIVING_API ABaseTrafficVehicle : public AActor
 public:	
 	// Sets default values for this actor's properties
 	ABaseTrafficVehicle();
+
+	void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION()
 	void SetSpawnLocation();
@@ -68,6 +105,10 @@ public:
 	};
 
 	UPROPERTY(EditAnywhere)
+	TArray<FWheelData> WheelData;
+
+
+	UPROPERTY(EditAnywhere)
 	TArray<FVector> WheelVectors;
 	UPROPERTY(EditAnywhere)
 	TArray<FVector> WheelRaycastPositions;
@@ -111,8 +152,6 @@ public:
 	UPROPERTY(EditAnywhere)
 	int NextLaneStatus = 1;
 
-
-
 	FVector RayHeightOffset = FVector(0, 0, 100);
 
 	//Vehicle Target Properties - Intended Direction, Collision Detection etc
@@ -145,6 +184,29 @@ public:
 	//Vehicle Traffic Manager Properties - Updating Spawning etc
 	UPROPERTY(VisibleAnywhere)
 	bool MarkedForRespawn = false;
+
+	//V2 Using Custom Physics to do car animation etc <-- merge all this code when done but 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	bool UseV2Physics = false;
+
+	UPROPERTY(EditAnywhere)
+	float Gravity = 980.0f; 
+	UPROPERTY(EditAnywhere)
+	float CarMass = 1000.0f; //kg?
+
+	UPROPERTY(EditAnywhere)
+	float VerticalVelocity = 0.0f;
+	UPROPERTY(EditAnywhere)
+	float CarBodyHeightOffset = 0.0f;
+
+	
+	UFUNCTION()
+	void DrivingVersionTwo(float DeltaTime);
+
+
+
+
+
 
 
 

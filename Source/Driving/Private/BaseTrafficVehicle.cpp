@@ -1,7 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-#include "Kismet/KismetMathLibrary.h"
 #include "BaseTrafficVehicle.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "TrafficWheelComponent.h"
+
 
 // Sets default values
 ABaseTrafficVehicle::ABaseTrafficVehicle()
@@ -28,8 +30,52 @@ ABaseTrafficVehicle::ABaseTrafficVehicle()
 
 		WheelVectors.Add(Direction * Distance);
 		WheelRaycastPositions.Add(FVector(0, 0, 0));
+
 	}
 
+	//V2 Fake Physics - Add Wheel Components
+	for (int i = 0; i < WheelOffsets.Num(); i++)
+	{
+		FString ComponentName = "WheelComponent" + FString::FromInt(i);
+		TObjectPtr<UTrafficWheelComponent> WheelComponent = CreateDefaultSubobject<UTrafficWheelComponent>(*ComponentName);
+		
+		FWheelData NewWheel;
+
+		NewWheel.WheelComponent = WheelComponent;
+		WheelComponent->SetWorldLocation(this->GetActorLocation() + WheelOffsets[i]);
+		WheelComponent->SetRelativeRotation(this->GetActorRightVector().ToOrientationQuat());
+
+		WheelData.Add(NewWheel);
+	}
+
+}
+
+void ABaseTrafficVehicle::OnConstruction(const FTransform& Transform)
+{
+
+	Super::OnConstruction(Transform);
+
+	//CAN REMOVE ALL THIS AFTER WE FIX PHYSICS
+	for (int i = 0; i < WheelData.Num(); i++)
+	{
+		WheelData[i].WheelComponent->SetRelativeLocation(WheelOffsets[i]);
+	}
+
+	for (int i = 0; i < WheelData.Num(); i++)
+	{
+		WheelData[i].WheelComponent->SetRelativeLocation(WheelOffsets[i]);
+	}
+
+	//Temp Debug Draw Location Remove this later, trying to debug phyics bs
+	for (int i = 0; i < WheelData.Num(); i++)
+	{
+		FVector ActorLocation = this->GetActorLocation();
+		FVector WheelLocal = ActorLocation + WheelData[i].WheelComponent->GetComponentLocation();
+
+		DrawDebugSphere(GetWorld(), GetActorLocation() + WheelData[i].WheelComponent->GetComponentLocation(), 100.0f, 16, FColor::Yellow, true, 100.0f, 1, 2.0f);
+		UE_LOG(LogTemp, Log, TEXT("WheelLocation at spawn: id: %d ,  %s"), i, *WheelLocal.ToString());
+		//UE_LOG(LogTemp, Log, TEXT("Actor Location: ,  %s"), i, *ActorLocation.ToString());
+	}
 }
 
 void ABaseTrafficVehicle::SetSpawnLocation()
@@ -444,39 +490,182 @@ void ABaseTrafficVehicle::BeginPlay()
 	CollisionParms.AddIgnoredActor(this);
 	
 	SetSpawnLocation();
+
+	//Temp Debug Draw Location Remove this later, trying to debug phyics bs
+	for (int i = 0; i < WheelData.Num(); i++)
+	{
+		FVector WheelLocal = GetActorLocation() + WheelData[i].WheelComponent->GetComponentLocation();
+
+		DrawDebugSphere(GetWorld(),GetActorLocation() + WheelData[i].WheelComponent->GetComponentLocation(), 100.0f, 16, FColor::Yellow, true, 100.0f, 1, 2.0f);
+		UE_LOG(LogTemp, Log, TEXT("WheelLocation at spawn: id: %d ,  %s"), i, *WheelLocal.ToString());
+		//UE_LOG(LogTemp, Log, TEXT("Actor Location: ,  %s"), i, *GetActorLocation().ToString());
+	}
+
+
+
 }
 
 // Called every frame
 void ABaseTrafficVehicle::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	if(isValidVehicle == false)
+	if (UseV2Physics)
 	{
-		return;
+		DrivingVersionTwo(DeltaTime);
+	}
+	else
+	{
+
+		if(isValidVehicle == false)
+		{
+			return;
+		}
+
+
+		//Get Current Spline Status for Checking
+		if (CurrentLane)
+		{
+			LaneStatus = CurrentLane->LaneStatus;
+
+			//if(SpawnPositionAlongSplineLength)
+		}
+
+
+		if (MarkedForRespawn == true)
+		{
+			//DrawDebugSphere(GetWorld(), this->GetActorLocation() + FVector(0, 0, 300),200.0f, 16, FColor::Red, false, 0.1, 10, 10);
+
+		}
+
+		//Vehicle Logic
+		//Assume its always driving for now
+		VehicleTargetUpdate(DeltaTime);
+
+
+		Driving(DeltaTime);
+	}
+}
+
+void ABaseTrafficVehicle::DrivingVersionTwo(float DeltaTime)
+{
+	FlushPersistentDebugLines(GetWorld());
+
+	FTransform CarCurrentTransform = this->GetActorTransform();
+
+	FVector AverageWheelsPosition;
+	float TotalSuspensionForce = 0.f;
+
+	for (int i = 0; i < WheelData.Num(); i++)
+	{
+		FTransform CombinedTransforms = WheelData[i].WheelComponent->GetComponentTransform() * this->GetActorTransform();
+		FMatrix TransformM;
+
+		//Wheel Center Marker
+		//DrawDebugSphere(GetWorld(), CombinedTransforms.GetLocation(), 50.0f, 16, FColor::Purple, true, 100.0f, 1, 2.0f);
+		
+		TransformM = CombinedTransforms.ToMatrixWithScale();
+
+		//Cast Down Form Wheel
+		FVector RayStart = CombinedTransforms.GetLocation() + (FVector::UpVector * 20.0f); //STart Point
+		FVector RayEnd = RayStart - FVector::UpVector * WheelData[i].MaxLength; //End Point
+
+		//Debug Draw
+		DrawDebugSphere(GetWorld(), RayStart, 10.0f, 16, FColor::Green, true, 1.0f, 8, 2.0f);
+
+
+		UE_LOG(LogTemp, Log, TEXT("WheelLocation id: %d ,  %s"),i, *RayStart.ToString());
+
+		FVector ResolvedWorldLocation = CombinedTransforms.GetLocation();
+
+		//DrawDebugLine(GetWorld(), RayStart, RayEnd, FColor::Blue, true, 1.0f, 2, 1.0f);
+
+		FHitResult HitResult;
+		bool bHit = GetWorld()->LineTraceSingleByChannel(HitResult, RayStart, RayEnd, ECC_WorldDynamic, CollisionParms);
+
+		if (bHit == true)
+		{
+
+			UE_LOG(LogTemp, Log, TEXT("RayHit"));
+
+			float HitDistance = (RayStart - HitResult.Location).Size();
+			UE_LOG(LogTemp, Log, TEXT("Hit Distance: %f"), HitDistance);
+			WheelData[i].CurrentCompression = FMath::Clamp(WheelData[i].RestLength - HitDistance, 0.0f, WheelData[i].RestLength);
+
+			DrawDebugSphere(GetWorld(), RayStart + FVector(0,0,WheelData[i].CurrentCompression), 50.0f, 16, FColor::Purple, true, 1.0f, 2, 2.0f);
+
+			WheelData[i].Velocity = (WheelData[i].CurrentCompression - WheelData[i].PreviousCompression) / DeltaTime;
+			WheelData[i].PreviousCompression = WheelData[i].CurrentCompression; //
+
+			float SpringForce = WheelData[i].CurrentCompression * WheelData[i].SuspensionStiffness;
+			float DampingForce = WheelData[i].Velocity * WheelData[i].SuspensionDamping;
+
+			float NetForce = SpringForce - DampingForce;
+
+			TotalSuspensionForce += NetForce;
+
+			ResolvedWorldLocation = FVector(ResolvedWorldLocation.X, ResolvedWorldLocation.Y, WheelData[i].CurrentCompression);
+
+			FVector LocalOffset = FVector(0, 0, WheelData[i].CurrentCompression);
+
+			WheelData[i].WheelComponent->SetWorldLocation(WheelData[i].WheelComponent->GetComponentLocation() + LocalOffset);
+			CombinedTransforms.SetLocation(WheelData[i].WheelComponent->GetComponentLocation() + LocalOffset);
+
+			DrawDebugLine(GetWorld(), RayStart, HitResult.Location, FColor::Green, true, 1.0f, 2, 2.0f);
+
+
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("Ray Miss"));
+
+			WheelData[i].CurrentCompression = 0.0f;
+			WheelData[i].WheelComponent->SetRelativeLocation(WheelOffsets[i]);
+			//CombinedTransforms.SetLocation(WheelData[i].WheelComponent->GetComponentLocation() + LocalOffset);
+			
+			DrawDebugLine(GetWorld(), CombinedTransforms.GetLocation(), RayEnd, FColor::Red, false, 0.1f, 2, 2.0f);
+		}
+
+
+		//Body Physics
+		float Weight = CarMass * Gravity;
+		float ForceDelta = TotalSuspensionForce - Weight;
+
+		float Acceleration = ForceDelta / CarMass;
+		VerticalVelocity += Acceleration * DeltaTime;
+		CarBodyHeightOffset += VerticalVelocity * DeltaTime;
+
+		//ClampBounce
+
+		VerticalVelocity *= 0.99f; //Damping
+
+		FVector BaseLocation = GetActorLocation(); //<--- Get From Spline
+		FVector TempLocal = BaseLocation + (FVector::UpVector * CarBodyHeightOffset);
+
+		CombinedTransforms.SetLocation(WheelData[i].WheelComponent->GetComponentLocation());
+
+		TransformM = CombinedTransforms.ToMatrixWithScale();
+
+		//SetActorLocation(TempLocal);
+				
+		DrawDebugCircle(GetWorld(), TransformM, 100.0f, 16, FColor::Yellow, true, 1.0f, 2, 2.0f, true);
+
+		DrawDebugBox(GetWorld(), TempLocal, FVector(300, 200, 180), FColor::Orange, true, 1.0f, 3, 2.0f);
+
+		AverageWheelsPosition += ResolvedWorldLocation;
+
 	}
 
-
-	//Get Current Spline Status for Checking
-	if (CurrentLane)
-	{
-		LaneStatus = CurrentLane->LaneStatus;
-
-		//if(SpawnPositionAlongSplineLength)
-	}
+	//Averaged Wheel Position
+	
 
 
-	if (MarkedForRespawn == true)
-	{
-		//DrawDebugSphere(GetWorld(), this->GetActorLocation() + FVector(0, 0, 300),200.0f, 16, FColor::Red, false, 0.1, 10, 10);
 
-	}
+	//Fake Set Car Position
+	//Apply Gravity
+	DrawDebugSphere(GetWorld(), AverageWheelsPosition * 0.25f, 100.0f, 16, FColor::Red, false, 1.0, 1, 2.0f);
+	
 
 
-	//Vehicle Logic
-	//Assume its always driving for now
-	VehicleTargetUpdate(DeltaTime);
-	Driving(DeltaTime);
 
 }
 
