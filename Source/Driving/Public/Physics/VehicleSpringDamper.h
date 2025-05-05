@@ -28,6 +28,9 @@ public:
 	TArray<FVector> WheelOffset = { FVector(150,100,0), FVector(150,-100,0), FVector(-150,100,0), FVector(-150,-100,0) };
 
 	UPROPERTY(EditAnywhere)
+	TArray<float> WheelIDs = { 1.0f, 1.0f, 0.0f, 0.0f};
+
+	UPROPERTY(EditAnywhere)
 	TArray<float> OldDistance = { 0.0f,0.0f,0.0f,0.0f };
 
 	//Suspension
@@ -122,7 +125,13 @@ public:
 	float WheelCircumference;
 
 	UPROPERTY(EditAnywhere)
-	float TempSteerAngle;
+	float SteerAngle;
+
+	UPROPERTY(EditAnywhere)
+	float TempRotationDelta;
+
+	UPROPERTY(EditAnywhere) //Can Remove this
+	float RotationDelta;
 
 protected:
 	// Called when the game starts or when spawned

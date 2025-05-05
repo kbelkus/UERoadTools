@@ -1,9 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
+#include "Physics/VehicleSpringDamper.h"
 #include "Components/SplineComponent.h"
 #include "LaneSpline.h"
-#include "Physics/VehicleSpringDamper.h"
 
 // Sets default values
 AVehicleSpringDamper::AVehicleSpringDamper()
@@ -73,41 +72,34 @@ FTransform AVehicleSpringDamper::GetPositionAlongSpline(float InSplineDelta, FTr
 void AVehicleSpringDamper::UpdateWheelRotations(float InSpeedDelta, FTransform InSteeringTarget, float DeltaTime, FVector InVehicleForwardDirection, FVector InVehicleLocation)
 {
 	//float RotationDelta = (WheelCircumference / InSpeedDelta) * DeltaTime;
-	float RotationDelta = (InSpeedDelta / (WheelCircumference * 0.01f)) * 360.0f * DeltaTime; // degrees
+	RotationDelta += (InSpeedDelta / (WheelCircumference * 0.01f)) * 360.0f * DeltaTime; // degrees
 
 	InVehicleLocation.Z = 0.0f;
 	FVector SteeringTargetLocation = InSteeringTarget.GetLocation();
 	SteeringTargetLocation.Z = 0.0f;
 
 	//Steering Angle
-	float Angle = FVector::DotProduct(InVehicleForwardDirection, (InVehicleLocation - SteeringTargetLocation).GetSafeNormal());
+	SteerAngle = FVector::DotProduct(InVehicleForwardDirection, (InVehicleLocation - SteeringTargetLocation).GetSafeNormal());
 
-	UE_LOG(LogTemp, Log, TEXT("Angle: %f, RotationDelta %f"), Angle, RotationDelta);
+	
 
-	FRotator Steer =  FRotator(0, 0, FMath::RadiansToDegrees(Angle));
+	DrawDebugLine(GetWorld(), InVehicleLocation, SteeringTargetLocation, FColor::Emerald, false, 1.0f, 1, 2.0f);
+	DrawDebugLine(GetWorld(), InVehicleLocation, InVehicleLocation + (InVehicleForwardDirection * 500.0f), FColor::Red, false, 1.0f, 1, 2.0f);
+
+	UE_LOG(LogTemp, Log, TEXT("Angle: %f, RotationDelta %f"), SteerAngle, RotationDelta);
+	//UE_LOG(LogTemp, Log, TEXT("InForwardVec: %s, RotationDelta %f"), FMath::RadiansToDegrees(SteerAngle), RotationDelta);
 
 	for (int i = 0; i < WheelMeshes.Num(); i++)
 	{
-		//FRotator NewRotation = FRotator(-RotationDelta, 0, 0);
 
-		//WheelMeshes[i]->AddRelativeRotation(NewRotation.Quaternion());
+		SteerAngle = SteerAngle * WheelIDs[i];
 
-		//WheelMeshes[i]->SetRelativeRotation(FRotator(0.0f, Angle, 0.0f).Quaternion());
-
-		FRotator SteerRotation = FRotator(0.0f, TempSteerAngle, 0.0f);
-		FRotator SpinRotation = FRotator(RotationDelta, 0.0f, 0.0f);
+		FRotator SteerRotation = FRotator(0.0f, FMath::RadiansToDegrees(-SteerAngle), 0.0f);
+		FRotator SpinRotation = FRotator(-RotationDelta, 0.0f, 0.0f);
 
 		FQuat FinalQuat = FQuat(SteerRotation) * FQuat(SpinRotation);
 		WheelMeshes[i]->SetRelativeRotation(FinalQuat);
-
-
-
 	}
-
-
-;
-
-
 }
 
 
@@ -305,7 +297,7 @@ void AVehicleSpringDamper::Tick(float DeltaTime)
 
 	DrawDebugSphere(GetWorld(), TargetTransform.GetLocation(), 50.0f, 16, FColor::Emerald, false, 1.0f, 1, 1.0f);
 
-	UpdateWheelRotations(CurrentSpeed, SplineTransform, DeltaTime, this->GetActorForwardVector(), CombinedLocation);
+	UpdateWheelRotations(CurrentSpeed, TargetTransform, DeltaTime, this->GetActorRightVector(), CombinedLocation);
 
 
 }

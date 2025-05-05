@@ -10,7 +10,7 @@
 class UProceduralMeshComponent;
 
 UENUM(BlueprintType)
-enum class ELaneTurningOptioms : uint8
+enum class ELaneTurningOptions : uint8
 {
 	ALL = 0 UMETA(DisplayName = "Any"),
 	LEFT = 1  UMETA(DisplayName = "Left Only"),
@@ -29,6 +29,26 @@ enum class ELaneDrivingType : uint8
 	BICYCLE = 3 UMETA(DisplayName = "Bicycle"),
 };
 
+
+//Struct to hold our road decals
+USTRUCT()
+struct FJunctionDecals
+{
+
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere)
+	FVector Location;
+	UPROPERTY(VisibleAnywhere)
+	FRotator Rotation;
+	UPROPERTY(VisibleAnywhere)
+	UStaticMeshComponent* MeshComponent;
+	
+	FJunctionDecals()
+	{
+
+	}
+};
 
 
 //Input Road Lane Data -- should match our data from ARoadSurface 
@@ -60,9 +80,9 @@ struct FJunctionLaneData
 	UPROPERTY(EditAnywhere)
 	TArray<FLaneMarking> LaneMarkings;
 	UPROPERTY(EditAnywhere)
-	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(EditAnywhere)
-	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
+	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
 
 	FJunctionLaneData()
 	{
@@ -86,9 +106,9 @@ struct FJunctionTurningLanePoint
 	UPROPERTY(VisibleAnywhere)
 	int LaneDirection; //0 = Forward 1 = Backwards (This is so we can automatically mark the driving direction)
 	UPROPERTY(VisibleAnywhere)
-	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(VisibleAnywhere)
-	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
+	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
 	UPROPERTY(VisibleAnywhere)
 	FVector ForwardVector;
 
@@ -107,6 +127,8 @@ struct FJunctionTurningLane
 	int TurningLaneID;
 	UPROPERTY(VisibleAnywhere)
 	TArray<FVector> TurningLanePoints;
+	UPROPERTY(VisibleAnywhere)
+	TArray<FVector>  TurningLanePointNormal;
 
 	FJunctionTurningLane()
 	{
@@ -351,9 +373,9 @@ struct FCapPoints
 	UPROPERTY()
 	int LaneDirection = 0; //Write data into here for the direction of the lane - since we use this for turning lane points 
 	UPROPERTY(EditAnywhere)
-	TEnumAsByte<ELaneTurningOptioms> TurningRule = ELaneTurningOptioms::ALL;
+	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(EditAnywhere)
-	TEnumAsByte<ELaneDrivingType> RoadType = ELaneDrivingType::NONE;
+	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
 
 	FCapPoints()
 	{
@@ -431,6 +453,7 @@ struct FJunctionPoint
 
 };
 
+
 //Store the data about each of our junction parts so we can use this data to generate the mesh later
 //and easily expose how we want to control the visual look of the junction
 USTRUCT()
@@ -457,18 +480,24 @@ struct FJunctionData
 
 };
 
-
-
 UCLASS()
 class ROADTOOLS_API AJunctionSurface : public AActor
 {
 	GENERATED_BODY()
 	
+
+
+
 public:	
 	// Sets default values for this actor's properties
 	AJunctionSurface();
 
 protected:
+
+
+
+	//DECLARE_CYCLE_STAT(TEXT("Calculate Lanes"), STAT_CalculateLanes, STATGROUP_EditorRoadTools);
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
@@ -482,8 +511,8 @@ protected:
 	TArray<FColor> JunctionColorCodes = { FColor::Red, FColor::Green, FColor::Blue, FColor::Yellow, FColor::Turquoise, FColor::Orange, FColor::Magenta, FColor::Emerald, FColor::White, FColor::Black, FColor::Purple, FColor::Silver, FColor::Yellow };
 
 	//Functions
-	virtual void OnConstruction(const FTransform& Transform) override;
-
+	virtual void OnConstruction(const FTransform & Transform) override;
+	
 	UFUNCTION()
 	void GenerateJunctionPoints();
 	UFUNCTION()
@@ -551,6 +580,10 @@ private:
 	UProceduralMeshComponent* JunctionCenterSurface;
 	UPROPERTY(EditAnywhere)
 	UProceduralMeshComponent* LaneMarkingsSurface;
+	UPROPERTY(EditAnywhere)
+	UProceduralMeshComponent* TurningLanesSurface;
+	UPROPERTY(EditAnywhere)
+	UProceduralMeshComponent* GenericLaneMarkingMaterial;
 
 public:
 
@@ -560,6 +593,10 @@ public:
 	bool ManualEditMode = false;
 	UPROPERTY(EditAnywhere)
 	bool LaneMarkings = false;
+	UPROPERTY(EditAnywhere)
+	bool CreateCenterLaneMarkings = false;
+	UPROPERTY(EditAnywhere)
+	bool CreateTurningLanes = false;
 	UPROPERTY(EditAnywhere)
 	bool DrawLaneConnections = false;
 	UPROPERTY(EditAnywhere)
@@ -588,7 +625,7 @@ public:
 	TArray<FBezierCornerPoints> BezierEdgePoints;
 	FVector JunctionBoundingBox;
 	UPROPERTY(VisibleAnywhere)
-	TArray<FJunctionTurningLanePoint> TurningLanePoints;
+	TArray<FJunctionTurningLanePoint> TurningLanePoints; //Is this used? DEP
 	UPROPERTY(VisibleAnywhere)
 	TArray<FTurningLaneConnections> TurningLaneConnections;
 	UPROPERTY(VisibleAnywhere)
@@ -599,6 +636,8 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* JunctionSurfaceMaterial;
+	UPROPERTY(EditAnywhere)
+	UMaterialInterface* TurningLaneSurfaceMaterial;
 
 	//Properties That are Set by RoadManager
 	UPROPERTY(EditAnywhere)

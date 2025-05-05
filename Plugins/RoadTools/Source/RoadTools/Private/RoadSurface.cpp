@@ -5,6 +5,7 @@
 #include "ProceduralMeshComponent.h"
 #include "Landscape.h"
 #include "PlotGenerator.h"
+#include "LaneSpline.h"
 
 // Sets default values
 ARoadSurface::ARoadSurface()
@@ -104,12 +105,7 @@ void ARoadSurface::OnConstruction(const FTransform& RootTransform)
 		{
 			PlotComponent->GeneratePlotAreas(SplinePointData);
 		}
-
-
 	}
-
-
-
 }
 
 
@@ -578,6 +574,153 @@ void ARoadSurface::DebugDrawVertices()
 			DrawDebugPoint(GetWorld(), AdvancedVertexPositions[i], 20.0f, FColor::Blue, true, -1.0f, 10);
 		}
 	}
+
+}
+
+void ARoadSurface::BuildAndUpdateLaneSplines()
+{
+	UE_LOG(LogTemp, Log, TEXT("Generated Lane Splines for traffic"));
+
+	//Move this to a function later
+	const int LaneSplinesToGenerate = LeftLanes.Num() + RightLanes.Num();
+	const int BoundLaneSplines = GeneratedLaneSplines.Num();
+	
+	const int GeneratedResolution = CenterSpline->GetSplineLength() / DistanceBetweenPoints; //Will Make One Point Per Meter
+
+	TArray<TSoftObjectPtr<ALaneSpline>> NewlyGeneratedLaneSplines;
+	
+	//For now, just delete/Remove all old splines, saves some hassle
+	for (TSoftObjectPtr<ALaneSpline> CurrentLaneSpline : GeneratedLaneSplines)
+	{
+		TObjectPtr<ALaneSpline> LoadedSpline = CurrentLaneSpline.LoadSynchronous();
+
+		if (LoadedSpline)
+		{
+			LoadedSpline->Destroy();
+		}
+	}
+
+	GeneratedLaneSplines.Empty();
+
+	if (LeftLanes.Num() > 0)
+	{
+		for (int i = 0; i < LeftLanes.Num(); i++)
+		{
+			//Create a whole new spline
+			TArray<FSplinePoint> CurrentLanePoints = CreateLanePoints(GeneratedResolution, i, LeftLanes[i], LeftLanes, 0);
+
+			if (!CurrentLanePoints.IsEmpty())
+			{
+				//Spawn A Lane Actor
+				FTransform SpawnTransform;
+				SpawnTransform.SetLocation(this->GetActorLocation());
+				FActorSpawnParameters SpawnParams;
+
+				TObjectPtr<ALaneSpline> NewLaneSpline = GetWorld()->SpawnActor<ALaneSpline>(SpawnParams);
+
+				if (NewLaneSpline)
+				{
+					TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
+
+					NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+
+					SplineComponent->ClearSplinePoints();
+					SplineComponent->AddPoints(CurrentLanePoints, true);
+
+					GeneratedLaneSplines.Add(NewLaneSpline);
+				}
+			}
+		}
+	}
+
+	if (RightLanes.Num() > 0)
+	{
+		for (int i = 0; i < RightLanes.Num(); i++)
+		{
+			//Create a whole new spline
+			TArray<FSplinePoint> CurrentLanePoints = CreateLanePoints(GeneratedResolution, i, RightLanes[i], RightLanes, 1);
+
+			if (!CurrentLanePoints.IsEmpty())
+			{
+				//Spawn A Lane Actor
+				FTransform SpawnTransform;
+				SpawnTransform.SetLocation(this->GetActorLocation());
+				FActorSpawnParameters SpawnParams;
+
+				TObjectPtr<ALaneSpline> NewLaneSpline = GetWorld()->SpawnActor<ALaneSpline>(SpawnParams);
+
+				if (NewLaneSpline)
+				{
+					TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
+
+					NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+
+					SplineComponent->ClearSplinePoints();
+
+					SplineComponent->AddPoints(CurrentLanePoints, true);
+					
+					
+
+					GeneratedLaneSplines.Add(NewLaneSpline);
+				}
+			}
+		}
+	}
+}
+
+TArray<FSplinePoint> ARoadSurface::CreateLanePoints(const int InResolution, const int LaneID, const FLaneData InLane, const TArray<FLaneData> InLaneArray, const int LaneDirection)
+{
+	TArray<FSplinePoint> LanePoints;
+
+	const float SplineLength = CenterSpline->GetSplineLength();
+	float IncrementDistance = SplineLength / InResolution;
+	float DistanceAlongSpline = 0.0f;
+
+
+	for (int i = 0; i < InResolution + 1; i++)
+	{
+		float TotalOffsetForLane = -InLaneArray[0].LaneWidth * 0.5f;
+
+		//Get Offset At Lane Cross Section
+		for (int j = 0; j < LaneID + 1; j++)
+		{
+			TotalOffsetForLane += (InLaneArray[j].LaneWidth);
+			UE_LOG(LogTemp, Log, TEXT("Lane Width at index %i, is: %f"), j, TotalOffsetForLane);
+		}
+
+		//-- Flip Spline Sample 
+		if (LaneDirection == 0)
+		{
+			//Forward Sample
+			DistanceAlongSpline = FMath::Clamp(IncrementDistance * i, 0, CenterSpline->GetSplineLength());
+		}
+		else
+		{
+			//Backward Direction
+			DistanceAlongSpline = SplineLength - FMath::Clamp(IncrementDistance * i, 0, CenterSpline->GetSplineLength());
+		}
+
+		//Get Offset Position
+		FVector OffsetPoint = CenterSpline->GetLocationAtDistanceAlongSpline(FMath::Clamp(DistanceAlongSpline, 0, CenterSpline->GetSplineLength()), ESplineCoordinateSpace::World);
+		FVector OffsetVector = CenterSpline->GetRightVectorAtDistanceAlongSpline(FMath::Clamp(DistanceAlongSpline, 0, CenterSpline->GetSplineLength()), ESplineCoordinateSpace::World);
+
+		//Offset our Point
+		FSplinePoint NewPoint;
+
+		NewPoint.Position = (OffsetPoint - this->GetActorLocation()) + (OffsetVector * TotalOffsetForLane);
+		NewPoint.InputKey = i;
+		NewPoint.Scale = FVector(1, 1, 1);
+
+		LanePoints.Add(NewPoint);
+	}
+
+	return LanePoints;
+
+}
+
+
+void ARoadSurface::CreateLaneSpline(const TArray<FVector> InSplinePoints)
+{
 
 }
 

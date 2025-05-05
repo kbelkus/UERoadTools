@@ -7,8 +7,9 @@ public class DrivingEditorTarget : TargetRules
 {
 	public DrivingEditorTarget(TargetInfo Target) : base(Target)
 	{
-		Type = TargetType.Editor;
-		DefaultBuildSettings = BuildSettingsVersion.V2;
+        bOverrideBuildEnvironment = true;
+        Type = TargetType.Editor;
+		//DefaultBuildSettings = BuildSettingsVersion.V2;
 
 		ExtraModuleNames.AddRange( new string[] { "Driving" } );
 	}

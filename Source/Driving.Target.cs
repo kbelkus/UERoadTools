@@ -7,8 +7,10 @@ public class DrivingTarget : TargetRules
 {
 	public DrivingTarget(TargetInfo Target) : base(Target)
 	{
-		Type = TargetType.Game;
-		DefaultBuildSettings = BuildSettingsVersion.V2;
+        bOverrideBuildEnvironment = true;
+        //DefaultBuildSettings = BuildSettingsVersion.Latest;
+        Type = TargetType.Game;
+		//DefaultBuildSettings = BuildSettingsVersion.V2;
 
 		ExtraModuleNames.AddRange( new string[] { "Driving" } );
 	}

@@ -8,6 +8,8 @@
 #include "Components/SplineComponent.h"
 #include "RoadSurface.generated.h"
 
+class UProceduralMeshComponent;
+class ALaneSpline;
 
 //Store our data when sampled from a point in this struct 
 USTRUCT()
@@ -39,12 +41,9 @@ struct FLaneMarking
 	UPROPERTY(EditAnywhere)
 	FVector2D UVOffset = FVector2D(0.0f, 0.0f);
 
-
 	FLaneMarking()
 	{
-
 	}
-
 };
 
 
@@ -76,7 +75,6 @@ struct FLaneData
 	FLaneData()
 	{
 		Material = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Road_Surface_Master_Inst.Road_Surface_Master_Inst"));
-
 	}
 };
 
@@ -97,7 +95,6 @@ struct FLaneSection
 	{
 
 	}
-
 };
 
 
@@ -114,7 +111,7 @@ struct FRoadProfile
 };
 
 
-class UProceduralMeshComponent;
+
 
 UCLASS()
 class ROADTOOLS_API ARoadSurface : public AActor
@@ -174,7 +171,20 @@ protected:
 	UFUNCTION()
 	void DebugDrawVertices();
 
-	//Override Construction SCript
+	//Editor Build Options
+	UFUNCTION(CallInEditor)
+	void BuildAndUpdateLaneSplines();
+
+	UFUNCTION()
+	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FLaneData InLane, const TArray<FLaneData> InLaneArray, const int o); //Create Points to feed into the lanespline
+
+	UFUNCTION()
+	void CreateLaneSpline(const TArray<FVector> InSplinePoints); //Create Points to feed into the lanespline
+
+	//UFUNCTION()
+	//void RebuildLaneSpline(const TArray<FVector> InSplinePoints, const TSoftObjectPtr<ALaneSpline> InLaneSpline);
+
+	//Override Construction Script
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 public:	
@@ -231,7 +241,12 @@ public:
 	UPROPERTY(EditAnywhere)
 	bool ProjectSpline = false;
 
+	//Lane Spline Data
+	UPROPERTY(EditAnywhere)
+	TArray<TSoftObjectPtr<ALaneSpline>> GeneratedLaneSplines;
 
+	UPROPERTY(EditAnywhere)
+	float DistanceBetweenPoints = 1000.0f;
 
 
 };
