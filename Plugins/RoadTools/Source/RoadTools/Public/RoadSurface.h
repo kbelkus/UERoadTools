@@ -176,7 +176,7 @@ protected:
 	void BuildAndUpdateLaneSplines();
 
 	UFUNCTION()
-	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FLaneData InLane, const TArray<FLaneData> InLaneArray, const int o); //Create Points to feed into the lanespline
+	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FLaneData InLane, const TArray<FLaneData> InLaneArray, const int LaneDirection); //Create Points to feed into the lanespline
 
 	UFUNCTION()
 	void CreateLaneSpline(const TArray<FVector> InSplinePoints); //Create Points to feed into the lanespline

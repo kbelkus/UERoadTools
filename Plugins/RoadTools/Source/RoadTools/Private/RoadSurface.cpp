@@ -654,13 +654,9 @@ void ARoadSurface::BuildAndUpdateLaneSplines()
 					TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 					NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
-
 					SplineComponent->ClearSplinePoints();
-
 					SplineComponent->AddPoints(CurrentLanePoints, true);
 					
-					
-
 					GeneratedLaneSplines.Add(NewLaneSpline);
 				}
 			}

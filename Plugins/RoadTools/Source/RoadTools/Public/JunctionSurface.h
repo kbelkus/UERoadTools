@@ -8,6 +8,7 @@
 #include "JunctionSurface.generated.h"
 
 class UProceduralMeshComponent;
+class ALaneSpline;
 
 UENUM(BlueprintType)
 enum class ELaneTurningOptions : uint8
@@ -136,8 +137,6 @@ struct FJunctionTurningLane
 	}
 };
 
-
-
 USTRUCT()
 struct FTurningLaneConnections
 {
@@ -154,8 +153,6 @@ struct FTurningLaneConnections
 	}
 
 };
-
-
 
 USTRUCT()
 struct FBezierCornerPoints
@@ -201,8 +198,6 @@ struct FJunctionRoadProperties
 	}
 };
 
-
-
 USTRUCT()
 struct FJunctionCenterPoints
 {
@@ -232,9 +227,6 @@ struct FJunctionCenterPoints
 	}
 };
 
-
-
-
 USTRUCT()
 struct FLaneCenterLinePoints
 {
@@ -255,9 +247,6 @@ struct FLaneCenterLinePoints
 	}
 
 };
-
-
-
 
 //These are Points that come from the Road Manager
 //TO DO: Find a way to make our own custom data type we can share between all classes
@@ -295,8 +284,6 @@ struct FJunctionOrder
 	FJunctionOrder()
 	{
 	}
-
-
 };
 
 
@@ -395,9 +382,7 @@ struct FJunctionIDPoints
 
 	FJunctionIDPoints()
 	{
-
 	}
-
 };
 
 
@@ -433,9 +418,6 @@ struct FJunctionPoint
 	UPROPERTY(EditAnywhere)
 	FVector RightVector;
 	TArray<FLaneCenterLinePoints> CenterLinePoints;
-
-
-
 
 	FJunctionPoint()
 	{
@@ -486,19 +468,12 @@ class ROADTOOLS_API AJunctionSurface : public AActor
 	GENERATED_BODY()
 	
 
-
-
 public:	
-	// Sets default values for this actor's properties
+
 	AJunctionSurface();
 
 protected:
 
-
-
-	//DECLARE_CYCLE_STAT(TEXT("Calculate Lanes"), STAT_CalculateLanes, STATGROUP_EditorRoadTools);
-
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	//User Input Data
@@ -558,6 +533,16 @@ protected:
 	UFUNCTION()
 	void DrawVertices(TArray<FVector>Vertices);
 
+	//Create Lane Spline Functions
+	//Editor Build Options
+	UFUNCTION(CallInEditor)
+	void BuildAndUpdateLaneSplines();
+
+	UFUNCTION()
+	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint); //Create Points to feed into the lanespline
+
+	UFUNCTION()
+	void CreateLaneSpline(const TArray<FVector> InSplinePoints); //Create Points to feed into the lanespline
 
 	//Generated Var
 	//TArray<FJunctionPoint> JunctionPoints;
@@ -664,5 +649,12 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	TArray<FJunctionRoadProperties> JunctionRoads;
+
+	//Build Lane Data Functions - Ideally these need to be merged into a utilities file. 
+	UPROPERTY(EditAnywhere)
+	TArray<TSoftObjectPtr<ALaneSpline>> GeneratedLaneSplines;
+
+	UPROPERTY(EditAnywhere)
+	float DistanceBetweenPoints = 1000.0f;
 
 };

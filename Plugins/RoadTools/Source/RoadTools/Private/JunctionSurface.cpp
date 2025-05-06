@@ -6,6 +6,7 @@
 #include "MathHelperFunctions.h"
 #include "DrawDebugHelpers.h"
 #include "Math/Vector.h"
+#include "LaneSpline.h"
 
 DECLARE_STATS_GROUP(TEXT("EditorRoadTools"), STATGROUP_EditorRoadTools, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("BuildJunction"), STAT_BuildJunction, STATGROUP_EditorRoadTools);
@@ -28,19 +29,14 @@ AJunctionSurface::AJunctionSurface()
 
 	//TurningLanesSurface = CreateDefaultSubobject<UProceduralMeshComponent>("TurningLanesSurface");
 	//TurningLanesSurface->SetupAttachment(GetRootComponent());
-
-
 }
-
 
 void AJunctionSurface::BuildJunction()
 {
 		//GenerateJunctionPoints();
 		DrawJunctionShape();
 		DrawJunctionVolume();
-	
 }
-
 
 void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 {
@@ -52,7 +48,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 	//Mode for when artists want to manually create a junction 
 		if (ManualEditMode == true)
 		{
-
 			FlushPersistentDebugLines(GetWorld());
 
 			JunctionSurface->ClearAllMeshSections();
@@ -104,7 +99,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 						//Lane Markings for this Junction
 						if (JunctionPoints[i].LeftLanes[j].LaneMarkings.Num() != 0)
 						{
-
 							ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingOffset);
 							ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
 
@@ -113,7 +107,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 							LaneMarkingsSurface->bCastDynamicShadow = false;
 
 						}
-
 					}
 
 					//Cap Points
@@ -256,39 +249,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 					JunctionCapPoints.Append(RightHandPoints);
 					CurrentJunctionPoints.Append(RightHandPoints);
 
-					//REMOVE ALL THIS
-
-					//Here Create our Junction Turning Lane Points -- Do it here to save redoing a ton of maths (SKIP LAST LANE, as we always assume its non drivable for now)
-
-
-					
-					//for (int h = 0; h < CurrentJunctionPoints.Num(); h++)
-					//{
-
-					//	FVector TempPLocation = CurrentJunctionPoints[h].Location;
-
-					//	FCapPoints TempJPoint = CurrentJunctionPoints[h];
-
-
-					//	int TempPointType = 0;
-
-					//	if (TempJPoint.RoadType == ELaneDrivingType::DRIVING)
-					//	{
-					//		TempPointType = 1;
-					//	}
-					//	if (TempJPoint.RoadType == ELaneDrivingType::SHOULDER)
-					//	{
-					//		TempPointType = 2;
-					//	}
-
-
-
-					//	//DrawDebugPoint(GetWorld(), TempPLocation, 10.0f, JunctionColorCodes[TempPointType], true, -1.0f, 2);
-
-					//}
-
-
-
 					CurrentJunctionPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
 						{
 							return A.PointType < B.PointType;
@@ -301,76 +261,59 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 
 
 					////TURNING LANE CENTER POINTS
-					//FVector CenterLocationPoint = JunctionCenter + this->GetActorLocation();
-					//TurningLaneCenterPoints = CurrentJunctionPoints;
+					FVector CenterLocationPoint = JunctionCenter + this->GetActorLocation();
+					TurningLaneCenterPoints = CurrentJunctionPoints;
 
-					//for (int p = 0; p < TurningLaneCenterPoints.Num(); p++)
-					//{
-					//	FVector PointLocation = TurningLaneCenterPoints[p].Location - CenterLocationPoint;
-					//	float Angle = FMath::Atan2(PointLocation.Y, PointLocation.X);
-					//	TurningLaneCenterPoints[p].AngleFromCenter = Angle;
-					//}
+					for (int p = 0; p < TurningLaneCenterPoints.Num(); p++)
+					{
+						FVector PointLocation = TurningLaneCenterPoints[p].Location - CenterLocationPoint;
+						float Angle = FMath::Atan2(PointLocation.Y, PointLocation.X);
+						TurningLaneCenterPoints[p].AngleFromCenter = Angle;
+					}
 
-
-
-
-
-
-
-
-
-
-					////Sort Points by Angle Temp
-					//TurningLaneCenterPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
-					//	{
-					//		return A.AngleFromCenter < B.AngleFromCenter;
-					//	});
-
-
-
-
-
-
-
-
+					//Sort Points by Angle Temp
+					TurningLaneCenterPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
+						{
+							return A.AngleFromCenter < B.AngleFromCenter;
+						});
 
 					//Turning Lane Points
-					//float tempVal = (1.0 / TurningLaneCenterPoints.Num());
+					float tempVal = (1.0 / TurningLaneCenterPoints.Num());
 
-					//for (int g = 0; g < TurningLaneCenterPoints.Num() - 1; g++)
-					//{
+					for (int g = 0; g < TurningLaneCenterPoints.Num() - 1; g++)
+					{
 
-					//	FVector CenterOfLane = (TurningLaneCenterPoints[g].Location + TurningLaneCenterPoints[g + 1].Location) * 0.5f;
+						FVector CenterOfLane = (TurningLaneCenterPoints[g].Location + TurningLaneCenterPoints[g + 1].Location) * 0.5f;
 
-					//	CenterOfLane = TurningLaneCenterPoints[g].Location;
+						CenterOfLane = TurningLaneCenterPoints[g].Location;
 
-					//	FJunctionTurningLanePoint TurningLanePoint;
+						FJunctionTurningLanePoint TurningLanePoint;
 
-					//	TurningLanePoint.JunctionID = i;
-					//	TurningLanePoint.Location = CenterOfLane;
-					//	TurningLanePoint.LaneDirection = TurningLaneCenterPoints[g + 1].LaneDirection;
-					//	TurningLanePoint.RoadType = TurningLaneCenterPoints[g].RoadType;
-					//	TurningLanePoint.TurningRule = TurningLaneCenterPoints[g].TurningRule;
+						TurningLanePoint.JunctionID = i;
+						TurningLanePoint.Location = CenterOfLane;
+						TurningLanePoint.LaneDirection = TurningLaneCenterPoints[g + 1].LaneDirection;
+						TurningLanePoint.RoadType = TurningLaneCenterPoints[g].RoadType;
+						TurningLanePoint.TurningRule = TurningLaneCenterPoints[g].TurningRule;
 
-					//	TurningLanePoints.Add(TurningLanePoint);
+						TurningLanePoints.Add(TurningLanePoint);
 
-					//	int ColorIndex = 0;
+						int ColorIndex = 0;
 
-					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::DRIVING)
-					//	{
-					//		ColorIndex = 1;
-					//	}
+						if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::DRIVING)
+						{
+							ColorIndex = 1;
+						}
 
-					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::SHOULDER)
-					//	{
-					//		ColorIndex = 2;
-					//	}
-
-
-					//	//DrawDebugPoint(GetWorld(), CenterOfLane, 10.0f, JunctionColorCodes[ColorIndex], true, -1.0f, 2);
+						if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::SHOULDER)
+						{
+							ColorIndex = 2;
+						}
 
 
-					//}
+						//DrawDebugPoint(GetWorld(), CenterOfLane, 10.0f, JunctionColorCodes[ColorIndex], true, -1.0f, 2);
+
+
+					}
 
 				}
 
@@ -388,10 +331,10 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 		//}
 		////Create Traffic Lane Data
 		//
-		//if (CreateTurningLanes == true)
-		//{
-		//	CreateTurningLanePoints();
-		//}
+		if (CreateTurningLanes == true)
+		{
+			CreateTurningLanePoints();
+		}
 
 
 
@@ -401,7 +344,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 	}
 
 }
-
 
 //Generate an Axis Aligned Bounds
 FVector AJunctionSurface::GenerateJunctionBounds()
@@ -416,7 +358,6 @@ void AJunctionSurface::DrawVertices(TArray<FVector>Vertices)
 		DrawDebugPoint(GetWorld(), Vertices[i], 10.0f, FColor::Magenta, true, -1.0f, 3);
 	}
 }
-
 
 void AJunctionSurface::ManualEditBuildCenterGeo()
 {
@@ -701,7 +642,6 @@ void AJunctionSurface::ManualEditBuildCenterGeo()
 
 }
 
-
 //Build the inner most lane markings 
 void AJunctionSurface::ManualEditBuildGenterMarkings()
 {
@@ -731,8 +671,6 @@ void AJunctionSurface::ManualEditBuildGenterMarkings()
 			BezierEdgePoints[i].Normal.Add(Normals[Normals.Num() - 1]);
 
 		}
-
-
 
 		float IncrementValue = 1.0 / (BezierEdgePoints.Num());
 
@@ -804,7 +742,6 @@ void AJunctionSurface::ManualEditBuildGenterMarkings()
 	}
 
 }
-
 
 //Use this to create turning lane point data
 void AJunctionSurface::CreateTurningLanePoints()
@@ -1047,10 +984,10 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 			FVector IntersectPoint = LineIntersection(TurningLaneConnections[i].StartPoint.Location, PointAEnd, TurningLaneConnections[i].EndPoints[j].Location, PointBEnd);
 
-			//DrawDebugPoint(GetWorld(), TurningLaneConnections[i].StartPoint.Location, 10.0f, FColor::Blue, true, -1.0f, 2);
-			//DrawDebugPoint(GetWorld(), TurningLaneConnections[i].EndPoints[j].Location, 10.0f, FColor::Red, true, -1.0f, 2);			
-			//DrawDebugPoint(GetWorld(), PointAEnd, 10.0f, FColor::Orange, true, -1.0f, 2);
-			//DrawDebugPoint(GetWorld(), PointBEnd, 10.0f, FColor::Green, true, -1.0f, 2);
+			DrawDebugPoint(GetWorld(), TurningLaneConnections[i].StartPoint.Location, 10.0f, FColor::Blue, true, -1.0f, 2);
+			DrawDebugPoint(GetWorld(), TurningLaneConnections[i].EndPoints[j].Location, 10.0f, FColor::Red, true, -1.0f, 2);			
+			DrawDebugPoint(GetWorld(), PointAEnd, 10.0f, FColor::Orange, true, -1.0f, 2);
+			DrawDebugPoint(GetWorld(), PointBEnd, 10.0f, FColor::Green, true, -1.0f, 2);
 
 
 			if (IntersectPoint.Length() == 0.0)
@@ -1137,8 +1074,6 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 }
 
-
-
 FVector AJunctionSurface::LineIntersection(FVector PointAStart, FVector PointAEnd, FVector PointBStart, FVector PointBEnd)
 {
 
@@ -1160,7 +1095,6 @@ FVector AJunctionSurface::LineIntersection(FVector PointAStart, FVector PointAEn
 	return FVector::ZeroVector; //No Point
 
 }
-
 
 //Run this to get the angle of each point from the center
 void AJunctionSurface::ManualEditPointsAngleFromCenter()
@@ -1208,7 +1142,6 @@ void AJunctionSurface::ManualEditFindIntersectPoints()
 }
 
 
-
 //When Editing Manually Reset some Properties back to our struct so we can sample them for construction
 void AJunctionSurface::ManualEditInitialiseJunction()
 {
@@ -1241,7 +1174,6 @@ void AJunctionSurface::ManualEditInitialiseJunction()
 
 }
 
-
 //Create our Center Line Points
 TArray<FLaneCenterLinePoints> AJunctionSurface::ManualEditCreateCenterLine(FJunctionPoint Junction)
 {
@@ -1271,7 +1203,6 @@ TArray<FLaneCenterLinePoints> AJunctionSurface::ManualEditCreateCenterLine(FJunc
 		return CenterLinePoints;
 
 }
-
 
 TArray<int> AJunctionSurface::ReturnTriangleIndicesFan(TArray<FVector> Vertices, int RootPointIndex, bool ReverseWindingOrder)
 {
@@ -1309,7 +1240,6 @@ TArray<int> AJunctionSurface::ReturnTriangleIndicesFan(TArray<FVector> Vertices,
 
 	return Indices;
 }
-
 
 TArray<int> AJunctionSurface::ReturnTriangleIndicesGrid(TArray<FVector> Vertices, int ColumnCount, bool ReverseWindingOrder)
 {
@@ -1386,12 +1316,6 @@ TArray<int> AJunctionSurface::ReturnTriangleIndicesGrid(TArray<FVector> Vertices
 
 	return Indices;
 }
-
-
-
-
-
-
 
 //DEP THIS WITH PROPER FUNCTION ABOVE
 void AJunctionSurface::ManualEditCreateLaneTriangles(int PointCount, bool ReverseWinding)
@@ -1475,8 +1399,6 @@ void AJunctionSurface::ManualEditCreateLaneTriangles(int PointCount, bool Revers
 	return;
 }
 
-
-
 void AJunctionSurface::ManualEditCreateLaneBoundaries(TArray<FJunctionLaneData> Lanes, TArray<FLaneCenterLinePoints> CenterLinePoints)
 {
 
@@ -1528,7 +1450,6 @@ void AJunctionSurface::ManualEditCreateLaneBoundaries(TArray<FJunctionLaneData> 
 
 }
 
-
 void AJunctionSurface::ManualEditCreateLaneMarkingVertices(int index, int PointCount, int LaneCount, float LaneLength, FVector2D UVTiling, FVector2D UVOffset, float MarkingWidth, float MarkingOffset)
 {
 	LaneMarkingVertices.Empty();
@@ -1577,8 +1498,6 @@ void AJunctionSurface::ManualEditCreateLaneMarkingVertices(int index, int PointC
 
 }
 
-
-
 //Go through our Lane boundaries and create the proper vertices for the lane to make
 void AJunctionSurface::ManualEditCreateLaneVertices(int index, int PointCount, int LaneCount, float LaneLength, FVector2D UVTiling, FVector2D UVOffset)
 {
@@ -1615,10 +1534,6 @@ void AJunctionSurface::ManualEditCreateLaneVertices(int index, int PointCount, i
 	}
 
 }
-
-
-
-
 
 //This is for manual editor mode - draw debug helpers to visualise junction
 void AJunctionSurface::ManualEditDrawJunctionShape()
@@ -1701,7 +1616,6 @@ void AJunctionSurface::ManualEditDrawJunctionShape()
 
 
 }
-
 
 //First Step is to generate all our key junctions Points - For each Incoming Road. Create three Points Where the junction bounds are
 void AJunctionSurface::GenerateJunctionPoints()
@@ -1814,8 +1728,6 @@ void AJunctionSurface::GenerateJunctionPoints()
 
 }
 
-
-
 //Draw our Junction Volume for Debugging //Sort All Points based on their angle to the center of the junction
 void AJunctionSurface::DrawJunctionVolume()
 {
@@ -1837,7 +1749,6 @@ void AJunctionSurface::DrawJunctionVolume()
 
 }
 
-
 //--Debug Draw Junction Shape RENAME THIS
 void AJunctionSurface::DrawJunctionShape()
 {
@@ -1851,8 +1762,6 @@ void AJunctionSurface::DrawJunctionShape()
 		}
 	}
 }
-
-
 
 //- THis is for Debugging all the Points in the Junction
 void AJunctionSurface::DrawRoadPoints()
@@ -1872,14 +1781,10 @@ void AJunctionSurface::DrawRoadPoints()
 	}
 }
 
-
-
-
 // Called when the game starts or when spawned
 void AJunctionSurface::BeginPlay()
 {
 	Super::BeginPlay();
-	
 }
 
 // Called every frame
@@ -1889,3 +1794,151 @@ void AJunctionSurface::Tick(float DeltaTime)
 
 }
 
+//A Lane Splne Creation
+//These are modifications from the RoadSurface -> We need to unify all this
+void AJunctionSurface::BuildAndUpdateLaneSplines()
+{
+	UE_LOG(LogTemp, Log, TEXT("Generated Lane Splines for traffic"));
+
+	//Remove All Current Related Splines
+	for (TSoftObjectPtr<ALaneSpline> CurrentLaneSpline : GeneratedLaneSplines)
+	{
+		TObjectPtr<ALaneSpline> LoadedSpline = CurrentLaneSpline.LoadSynchronous();
+
+		if (LoadedSpline)
+		{
+			LoadedSpline->Destroy();
+		}
+	}
+
+	GeneratedLaneSplines.Empty();
+
+	for (int i = 0; i < JunctionPoints.Num(); i++)
+	{
+		//Get JunctionLength
+		const int GeneratedResolution = ((JunctionPoints[i].Location - JunctionPoints[i].EndLocation).Size()) / DistanceBetweenPoints;
+
+		FJunctionPoint CurrentJunction = JunctionPoints[i];
+
+		//Generate all Left Lanes
+		if (CurrentJunction.LeftLanes.Num() > 0)
+		{
+			for (int Lane = 0; Lane < CurrentJunction.LeftLanes.Num(); Lane++)
+			{
+				TArray<FSplinePoint> CurrentLanePoints = CreateLanePoints(GeneratedResolution, Lane, CurrentJunction.LeftLanes[Lane], CurrentJunction.LeftLanes, 0, (JunctionPoints[i].Location - JunctionPoints[i].EndLocation).Size(),JunctionPoints[i]);
+
+				if (!CurrentLanePoints.IsEmpty())
+				{
+					//Spawn Lane Spline
+					FTransform SpawnTransform;
+					SpawnTransform.SetLocation(this->GetActorLocation());
+					FActorSpawnParameters SpawnParams;
+
+					TObjectPtr<ALaneSpline> NewLaneSpline = GetWorld()->SpawnActor<ALaneSpline>(SpawnParams);
+
+					if (NewLaneSpline)
+					{
+						TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
+
+						NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+						SplineComponent->ClearSplinePoints();
+						SplineComponent->AddPoints(CurrentLanePoints, true);
+
+						GeneratedLaneSplines.Add(NewLaneSpline);
+					}
+				}
+			}
+		}
+
+		//Generate all Left Lanes
+		if (CurrentJunction.RightLanes.Num() > 0)
+		{
+			for (int Lane = 0; Lane < CurrentJunction.RightLanes.Num(); Lane++)
+			{
+				TArray<FSplinePoint> CurrentLanePoints = CreateLanePoints(GeneratedResolution, Lane, CurrentJunction.RightLanes[Lane], CurrentJunction.RightLanes, 1, (JunctionPoints[i].Location - JunctionPoints[i].EndLocation).Size(), JunctionPoints[i]);
+
+				if (!CurrentLanePoints.IsEmpty())
+				{
+					//Spawn Lane Spline
+					FTransform SpawnTransform;
+					SpawnTransform.SetLocation(this->GetActorLocation());
+					FActorSpawnParameters SpawnParams;
+
+					TObjectPtr<ALaneSpline> NewLaneSpline = GetWorld()->SpawnActor<ALaneSpline>(SpawnParams);
+
+					if (NewLaneSpline)
+					{
+						TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
+
+						NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+						SplineComponent->ClearSplinePoints();
+						SplineComponent->AddPoints(CurrentLanePoints, true);
+
+						GeneratedLaneSplines.Add(NewLaneSpline);
+					}
+				}
+			}
+		}
+	}
+
+
+}
+
+TArray<FSplinePoint> AJunctionSurface::CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint)
+{
+	
+	TArray<FSplinePoint> LanePoints;
+
+	//const float SplineLength = InJunctionLength;
+	float DistanceAlongSpline = 0.0f;
+	const float IncrementDistance = 1.0 / InResolution;
+
+	for (int i = 0; i < InResolution + 1; i++)
+	{
+		float TotalOffsetForLane = -InLaneArray[0].LaneWidth * 0.5f;
+		float JunctionMaxDistance = (InJunctionPoint.CenterLinePoints[0].Location - InJunctionPoint.CenterLinePoints[InJunctionPoint.CenterLinePoints.Num() - 1].Location).Size();
+
+		FVector CenterLinePointMaxDist = InJunctionPoint.CenterLinePoints[InJunctionPoint.CenterLinePoints.Num() - 1].Location;
+
+		UE_LOG(LogTemp, Log, TEXT("Last Point of the CenterLine Location %s"), *CenterLinePointMaxDist.ToString());
+
+		//Get our Offset across Lane Section <-- Handle Turning Lanes here
+		for (int j = 0; j < LaneID + 1; j++)
+		{
+			TotalOffsetForLane += (InLaneArray[j].LaneWidth);
+			UE_LOG(LogTemp, Log, TEXT("Offset for Lane at lane id: %i Width is: %f   Accumulated Width is %f"), j, InLaneArray[j].LaneWidth, TotalOffsetForLane);
+		}
+
+		if (InLaneDirection == 0)
+		{
+			//Forward Sample
+			DistanceAlongSpline = FMath::Clamp(IncrementDistance * i, 0, 1.0);
+		}
+		else
+		{
+			//Backward Direction
+			DistanceAlongSpline = 1.0 - FMath::Clamp(IncrementDistance * i, 0, 1.0);
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("Junction Increment Distance %f"), DistanceAlongSpline);
+
+		//Get Offset Position
+		FVector OffsetPoint = FMath::Lerp(InJunctionPoint.Location + this->GetActorLocation(), InJunctionPoint.CenterLinePoints[InJunctionPoint.CenterLinePoints.Num() - 1].Location, DistanceAlongSpline);
+		FVector OffsetVector = InJunctionPoint.RightVector.GetSafeNormal();
+
+		FSplinePoint NewPoint;
+
+		NewPoint.Position = (OffsetPoint - this->GetActorLocation() + (OffsetVector * TotalOffsetForLane));
+		NewPoint.InputKey = i;
+		NewPoint.Scale = FVector(1, 1, 1);
+
+		LanePoints.Add(NewPoint);
+	}
+
+	return LanePoints;
+}
+
+void AJunctionSurface::CreateLaneSpline(const TArray<FVector> InSplinePoints)
+{
+
+}
