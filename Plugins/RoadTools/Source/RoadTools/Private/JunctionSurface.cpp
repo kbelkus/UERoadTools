@@ -261,59 +261,59 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 
 
 					////TURNING LANE CENTER POINTS
-					FVector CenterLocationPoint = JunctionCenter + this->GetActorLocation();
-					TurningLaneCenterPoints = CurrentJunctionPoints;
+					//FVector CenterLocationPoint = JunctionCenter + this->GetActorLocation();
+					//TurningLaneCenterPoints = CurrentJunctionPoints;
 
-					for (int p = 0; p < TurningLaneCenterPoints.Num(); p++)
-					{
-						FVector PointLocation = TurningLaneCenterPoints[p].Location - CenterLocationPoint;
-						float Angle = FMath::Atan2(PointLocation.Y, PointLocation.X);
-						TurningLaneCenterPoints[p].AngleFromCenter = Angle;
-					}
+					//for (int p = 0; p < TurningLaneCenterPoints.Num(); p++)
+					//{
+					//	FVector PointLocation = TurningLaneCenterPoints[p].Location - CenterLocationPoint;
+					//	float Angle = FMath::Atan2(PointLocation.Y, PointLocation.X);
+					//	TurningLaneCenterPoints[p].AngleFromCenter = Angle;
+					//}
 
-					//Sort Points by Angle Temp
-					TurningLaneCenterPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
-						{
-							return A.AngleFromCenter < B.AngleFromCenter;
-						});
+					////Sort Points by Angle Temp
+					//TurningLaneCenterPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
+					//	{
+					//		return A.AngleFromCenter < B.AngleFromCenter;
+					//	});
 
-					//Turning Lane Points
-					float tempVal = (1.0 / TurningLaneCenterPoints.Num());
+					////Turning Lane Points
+					//float tempVal = (1.0 / TurningLaneCenterPoints.Num());
 
-					for (int g = 0; g < TurningLaneCenterPoints.Num() - 1; g++)
-					{
+					//for (int g = 0; g < TurningLaneCenterPoints.Num() - 1; g++)
+					//{
 
-						FVector CenterOfLane = (TurningLaneCenterPoints[g].Location + TurningLaneCenterPoints[g + 1].Location) * 0.5f;
+					//	FVector CenterOfLane = (TurningLaneCenterPoints[g].Location + TurningLaneCenterPoints[g + 1].Location) * 0.5f;
 
-						CenterOfLane = TurningLaneCenterPoints[g].Location;
+					//	CenterOfLane = TurningLaneCenterPoints[g].Location;
 
-						FJunctionTurningLanePoint TurningLanePoint;
+					//	FJunctionTurningLanePoint TurningLanePoint;
 
-						TurningLanePoint.JunctionID = i;
-						TurningLanePoint.Location = CenterOfLane;
-						TurningLanePoint.LaneDirection = TurningLaneCenterPoints[g + 1].LaneDirection;
-						TurningLanePoint.RoadType = TurningLaneCenterPoints[g].RoadType;
-						TurningLanePoint.TurningRule = TurningLaneCenterPoints[g].TurningRule;
+					//	TurningLanePoint.JunctionID = i;
+					//	TurningLanePoint.Location = CenterOfLane;
+					//	TurningLanePoint.LaneDirection = TurningLaneCenterPoints[g + 1].LaneDirection;
+					//	TurningLanePoint.RoadType = TurningLaneCenterPoints[g].RoadType;
+					//	TurningLanePoint.TurningRule = TurningLaneCenterPoints[g].TurningRule;
 
-						TurningLanePoints.Add(TurningLanePoint);
+					//	TurningLanePoints.Add(TurningLanePoint);
 
-						int ColorIndex = 0;
+					//	int ColorIndex = 0;
 
-						if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::DRIVING)
-						{
-							ColorIndex = 1;
-						}
+					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::DRIVING)
+					//	{
+					//		ColorIndex = 1;
+					//	}
 
-						if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::SHOULDER)
-						{
-							ColorIndex = 2;
-						}
-
-
-						//DrawDebugPoint(GetWorld(), CenterOfLane, 10.0f, JunctionColorCodes[ColorIndex], true, -1.0f, 2);
+					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::SHOULDER)
+					//	{
+					//		ColorIndex = 2;
+					//	}
 
 
-					}
+					//	//DrawDebugPoint(GetWorld(), CenterOfLane, 10.0f, JunctionColorCodes[ColorIndex], true, -1.0f, 2);
+
+
+					//}
 
 				}
 
@@ -331,10 +331,10 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 		//}
 		////Create Traffic Lane Data
 		//
-		if (CreateTurningLanes == true)
-		{
-			CreateTurningLanePoints();
-		}
+		//if (CreateTurningLanes == true)
+		//{
+		//	CreateTurningLanePoints();
+		//}
 
 
 
@@ -747,6 +747,8 @@ void AJunctionSurface::ManualEditBuildGenterMarkings()
 void AJunctionSurface::CreateTurningLanePoints()
 {
 
+	UE_LOG(LogTemp, Log, TEXT("Rebuilding Turning Lanes"));
+
 	TArray<FJunctionTurningLanePoint>CreatedTurningLanePoints;
 	TArray<FJunctionTurningLanePoint> StartPoints;
 	TArray<FJunctionTurningLanePoint> EndPoints;
@@ -761,7 +763,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 	for(int i = 0; i < JunctionCenterLineEndPoint.Num(); i++)
 	{
 	
-		//DrawDebugPoint(GetWorld(), JunctionCenterLineEndPoint[i].Location, 10.0f, JunctionColorCodes[i], true, -1.0f, 2);
+		DrawDebugPoint(GetWorld(), JunctionCenterLineEndPoint[i].Location, 10.0f, JunctionColorCodes[i], true, -1.0f, 2);
 
 		//Get Lanes
 		int CurrentSampledJunctionID = JunctionCenterLineEndPoint[i].JunctionID;
@@ -845,11 +847,9 @@ void AJunctionSurface::CreateTurningLanePoints()
 	//Can Remove this
 	for (int i = 0; i < CreatedTurningLanePoints.Num(); i++)
 	{
-
 		FVector CenterLoc = CreatedTurningLanePoints[i].Location;
 		//UE_LOG(LogTemp, Warning, TEXT("Drawing Point %d"), i);
-		DrawDebugPoint(GetWorld(), CenterLoc, 10.0f, FColor::Blue, true, -1.0f, 2);
-
+		DrawDebugPoint(GetWorld(), CenterLoc, 10.0f, FColor::Blue, true, 1.0f, 2);
 	}
 
 
@@ -943,19 +943,19 @@ void AJunctionSurface::CreateTurningLanePoints()
 	}
 
 
-	////Debug Connections
-	//if (DrawLaneConnections == true && TurningLaneConnections.Num() != 0)
-	//{
-	//	if (DebugLaneConnectionID < TurningLaneConnections.Num())
-	//	{
-	//		FVector StartLineLocation = TurningLaneConnections[DebugLaneConnectionID].StartPoint.Location;
-	//		for (int i = 0; i < TurningLaneConnections[DebugLaneConnectionID].EndPoints.Num(); i++)
-	//		{
-	//			FVector EndLocation = TurningLaneConnections[DebugLaneConnectionID].EndPoints[i].Location;
-	//			DrawDebugLine(GetWorld(), StartLineLocation, EndLocation,JunctionColorCodes[i], true, -1.0f, 2, 10.0f);
-	//		}
-	//	}
-	//}
+	//Debug Connections
+	if (DrawLaneConnections == true && TurningLaneConnections.Num() != 0)
+	{
+		if (DebugLaneConnectionID < TurningLaneConnections.Num())
+		{
+			FVector StartLineLocation = TurningLaneConnections[DebugLaneConnectionID].StartPoint.Location;
+			for (int i = 0; i < TurningLaneConnections[DebugLaneConnectionID].EndPoints.Num(); i++)
+			{
+				FVector EndLocation = TurningLaneConnections[DebugLaneConnectionID].EndPoints[i].Location;
+				DrawDebugLine(GetWorld(), StartLineLocation, EndLocation,JunctionColorCodes[i], true, -1.0f, 2, 10.0f);
+			}
+		}
+	}
 
 	//For each of our connections we need to now make a spline and piece of geometry
 	//Spline for our traffic sim
@@ -1028,49 +1028,51 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 	}
 
-
-	//Make Geo
-	for (int i = 0; i < TurningLanes.Num(); i++)
-	{
-
-		//Create Vertices
-		TArray<FVector> TurningLaneVerts;
-		TArray<int> TurningLaneIndices;
-		TArray<FVector2D> UV;
-		
-		int PointCount = TurningLanes[i].TurningLanePoints.Num();
-
-		for (int j = 0; j < PointCount; j++)
-		{
-			//Create Left and Right Points
-			FVector RightVector = FVector::CrossProduct(TurningLanes[i].TurningLanePointNormal[j],FVector(0,0,1));
-
-			FVector P0 = TurningLanes[i].TurningLanePoints[j] + (RightVector * 175.0f); //175 is half our usual lane width - fix this
-			FVector P1 = TurningLanes[i].TurningLanePoints[j] + (-RightVector * 175.0f);
-
-			FVector VerticalLift = FVector(0.0f, 0.0f, 0.1f);
-
-			TurningLaneVerts.Add(P0 + VerticalLift);
-			TurningLaneVerts.Add(P1 + VerticalLift);
-
-			//UV
-			FVector2D P0UV = FVector2D(j, 0.0f);
-			FVector2D P1UV = FVector2D(j, 1.0f);
-
-			UV.Add(P0UV);
-			UV.Add(P1UV);
+	
 
 
-		}
-		
-		//Generate Indices
-		TurningLaneIndices = ReturnTriangleIndicesGrid(TurningLaneVerts, 2, true);
+	////Make Geo
+	//for (int i = 0; i < TurningLanes.Num(); i++)
+	//{
 
-		//TurningLanesSurface->CreateMeshSection(i, TurningLaneVerts, TurningLaneIndices, TArray<FVector>(), UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
-		//TurningLanesSurface->SetMaterial(i, TurningLaneSurfaceMaterial);
-		//TurningLanesSurface->CastShadow = false;
+	//	//Create Vertices
+	//	TArray<FVector> TurningLaneVerts;
+	//	TArray<int> TurningLaneIndices;
+	//	TArray<FVector2D> UV;
+	//	
+	//	int PointCount = TurningLanes[i].TurningLanePoints.Num();
 
-	}
+	//	for (int j = 0; j < PointCount; j++)
+	//	{
+	//		//Create Left and Right Points
+	//		FVector RightVector = FVector::CrossProduct(TurningLanes[i].TurningLanePointNormal[j],FVector(0,0,1));
+
+	//		FVector P0 = TurningLanes[i].TurningLanePoints[j] + (RightVector * 175.0f); //175 is half our usual lane width - fix this
+	//		FVector P1 = TurningLanes[i].TurningLanePoints[j] + (-RightVector * 175.0f);
+
+	//		FVector VerticalLift = FVector(0.0f, 0.0f, 0.1f);
+
+	//		TurningLaneVerts.Add(P0 + VerticalLift);
+	//		TurningLaneVerts.Add(P1 + VerticalLift);
+
+	//		//UV
+	//		FVector2D P0UV = FVector2D(j, 0.0f);
+	//		FVector2D P1UV = FVector2D(j, 1.0f);
+
+	//		UV.Add(P0UV);
+	//		UV.Add(P1UV);
+
+
+	//	}
+	//	
+	//	//Generate Indices
+	//	TurningLaneIndices = ReturnTriangleIndicesGrid(TurningLaneVerts, 2, true);
+
+	//	//TurningLanesSurface->CreateMeshSection(i, TurningLaneVerts, TurningLaneIndices, TArray<FVector>(), UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	//	//TurningLanesSurface->SetMaterial(i, TurningLaneSurfaceMaterial);
+	//	//TurningLanesSurface->CastShadow = false;
+
+	//}
 
 }
 
@@ -1881,8 +1883,59 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 		}
 	}
 
+	//Handle Junction / Turning Lanes
+	CreateTurningLanePoints();
+
+	//Create Splines
+	//FJunctionTurningLane
+	for (FJunctionTurningLane TurningLane : TurningLanes)
+	{
+
+		TArray<FSplinePoint> CurrenetTurningLanePoints = ConvertLocationsToSplinePoints(TurningLane.TurningLanePoints, -this->GetActorLocation());
+
+		FTransform SpawnTransform;
+		SpawnTransform.SetLocation(this->GetActorLocation());
+		FActorSpawnParameters SpawnParams;
+
+		TObjectPtr<ALaneSpline> NewLaneSpline = GetWorld()->SpawnActor<ALaneSpline>(SpawnParams);
+		NewLaneSpline->isJunctionLane = true;
+
+		if (NewLaneSpline)
+		{
+			TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
+
+			NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+			SplineComponent->ClearSplinePoints();
+			SplineComponent->AddPoints(CurrenetTurningLanePoints, true);
+			SplineComponent->EditorUnselectedSplineSegmentColor = JunctionColorCodes[TurningLane.TurningLaneID];
+			
+
+			GeneratedLaneSplines.Add(NewLaneSpline);
+		}
+	}
 
 }
+
+TArray<FSplinePoint> AJunctionSurface::ConvertLocationsToSplinePoints(TArray<FVector> InLocations, FVector OffsetPoint)
+{
+
+	TArray<FSplinePoint> ReturnPoints;
+
+	for (int i = 0; i < InLocations.Num(); i++)
+	{
+		FSplinePoint NewPoint;
+
+		NewPoint.Position = InLocations[i] + OffsetPoint;
+		NewPoint.InputKey = i;
+		NewPoint.Scale = FVector(1, 1, 1);
+
+		ReturnPoints.Add(NewPoint);
+	}
+
+
+	return ReturnPoints;
+}
+
 
 TArray<FSplinePoint> AJunctionSurface::CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint)
 {

@@ -544,6 +544,8 @@ protected:
 	UFUNCTION()
 	void CreateLaneSpline(const TArray<FVector> InSplinePoints); //Create Points to feed into the lanespline
 
+	UFUNCTION()
+	TArray<FSplinePoint> ConvertLocationsToSplinePoints(TArray<FVector> InLocations, FVector OffsetPoint);
 	//Generated Var
 	//TArray<FJunctionPoint> JunctionPoints;
 
