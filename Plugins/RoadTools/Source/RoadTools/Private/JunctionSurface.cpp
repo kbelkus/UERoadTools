@@ -336,11 +336,6 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 		//	CreateTurningLanePoints();
 		//}
 
-
-
-
-
-
 	}
 
 }
@@ -797,7 +792,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 			NewTurningLanePoint.Location = CurrentLaneCenterLocation;
 			NewTurningLanePoint.ForwardVector = CurrentJunctionForward;
 
-			//If the Lane Type is Driving, add it to our liset
+			//If the Lane Type is Driving, add it to our list
 			if (CurrentLane.RoadType == ELaneDrivingType::DRIVING)
 			{
 				CreatedTurningLanePoints.Add(NewTurningLanePoint);
@@ -1005,10 +1000,14 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 			for (int k = 0; k < 31; k++)
 			{
-				FVector BezierCurveLocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].EndPoints[j].Location, IntersectPoint, TurningLaneConnections[i].StartPoint.Location, k * IncrementT);
-				
-				FVector SecondBezierCurvelocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].EndPoints[j].Location, IntersectPoint, TurningLaneConnections[i].StartPoint.Location, (k + 1) * IncrementT);
-				
+				//Original
+				//FVector BezierCurveLocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].EndPoints[j].Location, IntersectPoint, TurningLaneConnections[i].StartPoint.Location, k * IncrementT);
+				FVector BezierCurveLocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].StartPoint.Location, IntersectPoint, TurningLaneConnections[i].EndPoints[j].Location, k * IncrementT);
+
+				//Original
+				//FVector SecondBezierCurvelocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].EndPoints[j].Location, IntersectPoint, TurningLaneConnections[i].StartPoint.Location, (k + 1) * IncrementT);
+				FVector SecondBezierCurvelocation = MathHelperFunctions::BezierCurvePosition(TurningLaneConnections[i].StartPoint.Location, IntersectPoint, TurningLaneConnections[i].EndPoints[j].Location, (k + 1) * IncrementT);
+
 				FVector TempNormal = BezierCurveLocation - SecondBezierCurvelocation;
 				TempNormal.Normalize();
 
@@ -1378,8 +1377,6 @@ void AJunctionSurface::ManualEditCreateLaneTriangles(int PointCount, bool Revers
 				int first = (rootIndex + j);
 				int second = (rootIndex + j) + 1;
 				int third = (rootIndex + j) + widthPoints;
-
-
 
 				//SECOND TRIANGLE
 				int fourth = (rootIndex + j) + 1;
@@ -1882,6 +1879,7 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 			}
 		}
 	}
+
 
 	//Handle Junction / Turning Lanes
 	CreateTurningLanePoints();
