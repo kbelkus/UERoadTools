@@ -86,7 +86,7 @@ void AVehicleSpringDamper::UpdateWheelRotations(float InSpeedDelta, FTransform I
 	DrawDebugLine(GetWorld(), InVehicleLocation, SteeringTargetLocation, FColor::Emerald, false, 1.0f, 1, 2.0f);
 	DrawDebugLine(GetWorld(), InVehicleLocation, InVehicleLocation + (InVehicleForwardDirection * 500.0f), FColor::Red, false, 1.0f, 1, 2.0f);
 
-	UE_LOG(LogTemp, Log, TEXT("Angle: %f, RotationDelta %f"), SteerAngle, RotationDelta);
+	//UE_LOG(LogTemp, Log, TEXT("Angle: %f, RotationDelta %f"), SteerAngle, RotationDelta);
 	//UE_LOG(LogTemp, Log, TEXT("InForwardVec: %s, RotationDelta %f"), FMath::RadiansToDegrees(SteerAngle), RotationDelta);
 
 	for (int i = 0; i < WheelMeshes.Num(); i++)
@@ -179,8 +179,9 @@ void AVehicleSpringDamper::Tick(float DeltaTime)
 
 			float Compression = RestLength - CurrentLength;
 
-
 			float VelocityAlongSpring = (OldDistance[i] - CurrentLength) / DeltaTime;
+
+			//UE_LOG(LogTemp, Log, TEXT("SpringDamper Velocity Along Spring %f"), VelocityAlongSpring);
 
 			//UE_LOG(LogTemp, Log, TEXT("Compression: %f, VelocityAlongSpring: %f"), Compression, VelocityAlongSpring);
 
@@ -215,8 +216,8 @@ void AVehicleSpringDamper::Tick(float DeltaTime)
 
 			FVector Torque = FVector::CrossProduct(ToWheel, Force);
 
-			DrawDebugLine(GetWorld(), Anchor, Anchor + (Force * 0.0001), FColor::Turquoise, true, -1.0f, 2, 1.0f);
-			DrawDebugLine(GetWorld(), Anchor, Anchor + (Torque * 0.000001), FColor::Cyan, true, -1.0f, 2, 1.0f);
+			DrawDebugLine(GetWorld(), Anchor, Anchor + (Force * 0.01), FColor::Turquoise, true, -1.0f, 10.0f, 2.0f);
+			DrawDebugLine(GetWorld(), Anchor, Anchor + (Torque * 0.0001), FColor::Cyan, true, -1.0f, 2, 1.0f);
 
 
 			AccumulilatedTorque += Torque;
@@ -286,6 +287,7 @@ void AVehicleSpringDamper::Tick(float DeltaTime)
 	FVector CombinedLocation = FVector(SplineTransform.GetLocation().X, SplineTransform.GetLocation().Y, (this->GetActorLocation() += VehicleVelocity * DeltaTime).Z);
 
 	this->SetActorLocation(CombinedLocation);
+	//UE_LOG(LogTemp, Log, TEXT("Vehicle Spring Damper Velo %s"), *AccumilatedForce.ToString());
 
 	BodyMesh->SetWorldLocation(CombinedLocation);
 

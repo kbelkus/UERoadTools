@@ -111,7 +111,7 @@ void ATrafficManager::InitialiseTrafficAgents()
 			NewTrafficAgent->CurrentLane = AvailableRoads[RoadIndex].Lane;
 			NewTrafficAgent->PositionAlongSplineLength = 0.0;
 			NewTrafficAgent->VehicleSpeed = 800.0f;
-			NewTrafficAgent->VehicleMesh->SetStaticMesh(TrafficLibrary[0]->VehicleMesh->GetStaticMesh());
+			NewTrafficAgent->VehicleBodyMesh->SetStaticMesh(TrafficLibrary[0]->VehicleBodyMesh->GetStaticMesh());
 			NewTrafficAgent->SetSpawnLocation();	
 		}
 

@@ -6,10 +6,13 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "LaneSpline.h"
+#include "AIVehicleDynamicsUtilities.h"
 #include "BaseTrafficVehicle.generated.h"
 
 class UTrafficWheelComponent;
+class UVehicleDynamicsDataAsset;
 
+//CAN DEP THIS
 USTRUCT()
 struct FWheelData
 {
@@ -55,6 +58,12 @@ public:
 	void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION()
+	bool BuildVehicleData();
+
+	UFUNCTION()
+	void CreateWheelMeshes();
+
+	UFUNCTION()
 	void SetSpawnLocation();
 
 	//Vehicle Logic
@@ -65,7 +74,6 @@ public:
 	UFUNCTION()
 	FVector ResolveVehicleLocation(FVector SplineLocation, FRotator Rotation);
 	
-
 	//Car Target
 	UFUNCTION()
 	void GetNextLane();
@@ -74,6 +82,12 @@ public:
 	UFUNCTION()
 	void DebugDrawTarget();
 
+	//Physics / Vehicle Locomotion - can move this to utilities later
+	UFUNCTION()
+	void ResolveVehiclePhysics(float InDeltaTime, FVector InSplineLocation, FRotator InSplineRotation);
+	
+	UFUNCTION()
+	FVector CalculateCOM();
 
 protected:
 	// Called when the game starts or when spawned
@@ -93,7 +107,6 @@ public:
 		return FMath::RandRange(Min, Max);
 	}
 		
-
 	//Car Tweakables
 	UPROPERTY(EditAnywhere)
 		TArray<FVector> WheelOffsets = 
@@ -104,22 +117,33 @@ public:
 		FVector(-100.0f,-75.0f,0.0f)
 	};
 
-	UPROPERTY(EditAnywhere)
-	TArray<FWheelData> WheelData;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TSoftObjectPtr<UVehicleDynamicsDataAsset> VehicleDynamicsDataAsset;
 
+	UPROPERTY()
+	FVehicleDynamicsData VehicleDynamicsStruct;
 
 	UPROPERTY(EditAnywhere)
-	TArray<FVector> WheelVectors;
+	TObjectPtr<UStaticMeshComponent> VehicleBodyMesh;
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<TObjectPtr<UStaticMeshComponent>> WheelMeshes;
+
 	UPROPERTY(EditAnywhere)
-	TArray<FVector> WheelRaycastPositions;
+	TArray<FWheelData> WheelData; //CAN DEP
+
+	UPROPERTY(EditAnywhere)
+	TArray<FVector> WheelVectors; //DUNNO
+	UPROPERTY(EditAnywhere)
+	TArray<FVector> WheelRaycastPositions; //DUNNO
 
 	//Car Current Values -- What is the car doing on this frame?
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(VisibleAnywhere)
 	float VehicleSpeed = 0.0f; //Current Speed
 	UPROPERTY(EditAnywhere)
-	FVector VehicleWorldLocation;
+	FVector VehicleWorldLocation; //CAN DEP
 	UPROPERTY(EditAnywhere)
-	FRotator VehicleWorldRotation;
+	FRotator VehicleWorldRotation; //Do we need this?
 	UPROPERTY(EditAnywhere)
 	ALaneSpline* CurrentLane;
 	UPROPERTY()
@@ -167,13 +191,10 @@ public:
 	UPROPERTY(EditAnywhere)
 	bool FoundNextLane = false; //Check so that, we dont keep getting a new lane when we are sat at traffic light
 
-	//Vehicle Properties - Stuff thatcont
+	//Vehicle Properties
 	UPROPERTY(EditAnywhere)
-	float VehicleMaxSpeed = 60.0f; //Max Speed
-	UPROPERTY(EditAnywhere)
-	UStaticMeshComponent* VehicleMesh;
-	UPROPERTY(EditAnywhere)
-	UStaticMesh* VehicleBodyMesh;
+	float VehicleMaxSpeed = 60.0f; //Max Speed CAN DEP
+
 
 	//Vehicle Init properties -- Set by Traffic Manager
 	UPROPERTY(EditAnywhere)
@@ -189,25 +210,53 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere)
 	bool UseV2Physics = false;
 
+	//CLEAN THIS UP - AS ITS MOVED INTO DATAASSET
 	UPROPERTY(EditAnywhere)
-	float Gravity = 980.0f; 
+	FVector Gravity = FVector(0.0f,0.0f,-980.0f); 
 	UPROPERTY(EditAnywhere)
-	float CarMass = 1000.0f; //kg?
-
+	float VehicleMass = 2000.0f; //kg?
 	UPROPERTY(EditAnywhere)
 	float VerticalVelocity = 0.0f;
 	UPROPERTY(EditAnywhere)
 	float CarBodyHeightOffset = 0.0f;
+	UPROPERTY(EditAnywhere)
+	float SuspensionOffset = 50.0f; //Move suspension anchor Up or Down
+	UPROPERTY(EditAnywhere)
+	float MaxSuspensionLength = 80.0f; //Suspension Length
+	UPROPERTY(EditAnywhere)
+	float SuspensionRestLength = 80.0f;
+	UPROPERTY(EditAnywhere)
+	float SuspensionSpringStiffness = 20000.0f;
+	UPROPERTY(EditAnywhere)
+	float SuspensionDampingCoefficient = 1000.0f;
+	UPROPERTY(EditAnywhere)
+	TArray<float> SuspensionPrevDistance = { 0.0f,0.0f,0.0f,0.0f };
+	UPROPERTY(EditAnywhere)
+	float WheelRadius = 0.0f; //Suspension Length
+	UPROPERTY(EditAnywhere)
+	FVector VehicleVelocity = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere)
+	FVector VehicleAngularVelocity = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere)
+	FVector AccumilatedForce = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere)
+	FVector AccumilatedTorque = FVector::ZeroVector;
+	UPROPERTY(VisibleAnywhere)
+	FVector VehicleCOM = FVector::ZeroVector;
+	UPROPERTY(EditAnywhere)
+	FVector InertialTensor = FVector(10000.0f, 10000.0f, 10000.0f); // tweak manually
+	UPROPERTY(EditAnywhere)
+	float IntertialTensorScale = 1.0f;
+	FQuat ActorRotation;
 
-	
-	UFUNCTION()
+	//Physics Debug
+	UPROPERTY(EditAnywhere)
+	FVector CarBodyBoxLocation = FVector(0, 0, 0);
+	UPROPERTY(EditAnywhere)
+	FVector CarBodyBoxExtents = FVector(150, 60, 75);
+
+	UFUNCTION() //DEP THIS
 	void DrivingVersionTwo(float DeltaTime);
-
-
-
-
-
-
 
 
 };
