@@ -81,8 +81,6 @@ void AVehicleSpringDamper::UpdateWheelRotations(float InSpeedDelta, FTransform I
 	//Steering Angle
 	SteerAngle = FVector::DotProduct(InVehicleForwardDirection, (InVehicleLocation - SteeringTargetLocation).GetSafeNormal());
 
-	
-
 	DrawDebugLine(GetWorld(), InVehicleLocation, SteeringTargetLocation, FColor::Emerald, false, 1.0f, 1, 2.0f);
 	DrawDebugLine(GetWorld(), InVehicleLocation, InVehicleLocation + (InVehicleForwardDirection * 500.0f), FColor::Red, false, 1.0f, 1, 2.0f);
 

@@ -46,28 +46,6 @@ void ABaseTrafficVehicle::OnConstruction(const FTransform& Transform)
 
 	Super::OnConstruction(Transform);
 
-	//CAN REMOVE ALL THIS AFTER WE FIX PHYSICS
-	//for (int i = 0; i < WheelData.Num(); i++)
-	//{
-	//	WheelData[i].WheelComponent->SetRelativeLocation(WheelOffsets[i]);
-	//}
-
-	//for (int i = 0; i < WheelData.Num(); i++)
-	//{
-	//	WheelData[i].WheelComponent->SetRelativeLocation(WheelOffsets[i]);
-	//}
-
-	//Temp Debug Draw Location Remove this later, trying to debug phyics bs
-	//for (int i = 0; i < WheelData.Num(); i++)
-	//{
-	//	FVector ActorLocation = this->GetActorLocation();
-	//	FVector WheelLocal = ActorLocation + WheelData[i].WheelComponent->GetComponentLocation();
-
-	//	DrawDebugSphere(GetWorld(), GetActorLocation() + WheelData[i].WheelComponent->GetComponentLocation(), 100.0f, 16, FColor::Yellow, true, 100.0f, 1, 2.0f);
-	//	UE_LOG(LogTemp, Log, TEXT("WheelLocation at spawn: id: %d ,  %s"), i, *WheelLocal.ToString());
-	//	//UE_LOG(LogTemp, Log, TEXT("Actor Location: ,  %s"), i, *ActorLocation.ToString());
-	//}
-
 	CalculateCOM();
 }
 
@@ -91,6 +69,9 @@ bool ABaseTrafficVehicle::BuildVehicleData()
 
 	//Spawn Wheels
 	CreateWheelMeshes();
+
+	//Precache some vehicle data
+	PreCalculatedWheelCircumference = 2 * 3.14159 * VehicleDynamicsStruct.WheelRadius;
 
 	return VehicleIsBuilt;
 }
@@ -184,7 +165,7 @@ void ABaseTrafficVehicle::VehicleTargetUpdate(float dt)
 		StatusIndicator = FColor::Red;
 	}
 
-	DrawDebugSphere(GetWorld(), TargetLocation, 100.0f, 16, StatusIndicator, false, 1.0, 1, 2.0f);
+	DrawDebugSphere(GetWorld(), TargetLocation, 20.0f, 16, StatusIndicator, false, 1.0, 1, 1.0f);
 
 }
 
@@ -400,7 +381,6 @@ void ABaseTrafficVehicle::ResolveVehiclePhysics(float InDeltaTime, FVector InSpl
 	FTransform CurrentActorTransform = this->GetActorTransform();
 
 	VehicleVelocity += Gravity * InDeltaTime;
-	UE_LOG(LogTemp, Log, TEXT("Vehicle Velocity after gravity %s"), *VehicleAngularVelocity.ToString());
 	InertialTensor = VehicleDynamicsStruct.InertialTensor * VehicleDynamicsStruct.IntertialTensorScale;
 	FVector TransformedCOM = CurrentActorTransform.TransformPosition(VehicleCOM);
 
@@ -420,11 +400,12 @@ void ABaseTrafficVehicle::ResolveVehiclePhysics(float InDeltaTime, FVector InSpl
 
 		if (bHit)
 		{
-			 FVector HitLocation = HitResult.Location + FVector(0, 0, VehicleDynamicsStruct.WheelRadius);
-			 FVector SuspensionDirection = (SupsensionAnchor - HitLocation).GetSafeNormal();
-			 float SuspensionCurrentLength = FMath::Clamp((SupsensionAnchor - HitLocation).Size(),1.0f, VehicleDynamicsStruct.MaxSuspensionLength);
+			FVector HitLocation = HitResult.Location + FVector(0, 0, VehicleDynamicsStruct.WheelRadius);
+			FVector SuspensionDirection = (SupsensionAnchor - HitLocation).GetSafeNormal();
+			float SuspensionCurrentLength = FMath::Clamp((SupsensionAnchor - HitLocation).Size(),1.0f, VehicleDynamicsStruct.MaxSuspensionLength);
 
-			 float Compression = SuspensionRestLength - SuspensionCurrentLength;
+			 //Test Code
+			float Compression = VehicleDynamicsStruct.SuspensionRestLength - SuspensionCurrentLength;
 
 			float VelocityAlongSpring = (SuspensionPrevDistance[i] - SuspensionCurrentLength) / InDeltaTime;
 
@@ -452,17 +433,18 @@ void ABaseTrafficVehicle::ResolveVehiclePhysics(float InDeltaTime, FVector InSpl
 
 			AccumilatedTorque += Torque;
 
+			UpdateWheelRotation(i,InDeltaTime, CurrentActorTransform.GetLocation());
+
 			//Debug Draw Outputs
 			//Draw COM
 			DrawDebugSphere(GetWorld(), TransformedCOM + FVector(0, 0, SuspensionOffset), 10.0f, 16, FColor::Blue, true, 1.0, 1, 0.5f);
 			DrawDebugLine(GetWorld(), TransformedCOM + FVector(0, 0, SuspensionOffset), (TransformedCOM + FVector(0, 0, SuspensionOffset)) + (ToWheel), FColor::Orange, true, -1.0f, 2, 1.0f);
-			DrawDebugLine(GetWorld(), SupsensionAnchor, SupsensionAnchor + (Force * 0.0001), FColor::Turquoise, true, -1.0f, 2, 1.0f);
-			DrawDebugLine(GetWorld(), SupsensionAnchor, SupsensionAnchor + (Torque * 0.000001), FColor::Cyan, true, -1.0f, 2, 1.0f);
+			//DrawDebugLine(GetWorld(), SupsensionAnchor, SupsensionAnchor + (Force * 0.0001), FColor::Turquoise, true, -1.0f, 2, 1.0f);
+			//DrawDebugLine(GetWorld(), SupsensionAnchor, SupsensionAnchor + (Torque * 0.000001), FColor::Cyan, true, -1.0f, 2, 1.0f);
 			DrawDebugSphere(GetWorld(), SupsensionAnchor, 10.0f, 16, FColor::Blue, true, 1.0, 1, 0.5f);
 			DrawDebugSphere(GetWorld(), HitResult.Location, 10.0f, 16, FColor::Green, true, 1.0, 1, 0.5f);
 			DrawDebugSphere(GetWorld(), SuspensionTarget, 25.0f, 16, FColor::Purple, true, 1.0, 1, 1.0f);
 			DrawDebugLine(GetWorld(), SupsensionAnchor, HitResult.Location, FColor::Green, true, -1.0f, 1, 2.0f);
-
 		}
 		else
 		{
@@ -489,8 +471,6 @@ void ABaseTrafficVehicle::ResolveVehiclePhysics(float InDeltaTime, FVector InSpl
 		VehicleAngularVelocity = FVector::ZeroVector;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Angular Velocity = %s"), *VehicleAngularVelocity.ToString());
-
 	//Combine Rotatation and Transforms here
 	FRotator PhysicsRotation = GetActorRotation();
 	FRotator SplineRotation = InSplineRotation;
@@ -507,26 +487,21 @@ void ABaseTrafficVehicle::ResolveVehiclePhysics(float InDeltaTime, FVector InSpl
 	FVector CombinedLocation = FVector(InSplineLocation.X, InSplineLocation.Y, (this->GetActorLocation() += VehicleVelocity * InDeltaTime).Z);
 
 	this->SetActorLocation(CombinedLocation);
-	//UE_LOG(LogTemp, Log, TEXT("Vehicle Velo BaseTrafficVeh %s"), *AccumilatedForce.ToString());
+
 
 	//BodyMesh->SetWorldLocation(CombinedLocation);
 
-	DrawDebugBox(GetWorld(), (CombinedLocation + FVector(0,0,0)), CarBodyBoxExtents, ActorRotation, FColor::Blue, true, 1.0f, 1, 1.0f);
+	DrawDebugBox(GetWorld(), (CombinedLocation + VehicleDynamicsStruct.VehicleExtendsOffset), VehicleDynamicsStruct.VehicleExtends, ActorRotation, FColor::Blue, true, 1.0f, 1, 1.0f);
 
 	//Update Speed
-	//CurrentSpeed = (CombinedLocation - PreviousLocation).Size();
-	//PreviousLocation = CombinedLocation;
+	CurrentSpeed = (CombinedLocation - PreviousLocation).Size();
+	PreviousLocation = CombinedLocation;
 
-	//DrawDebugSphere(GetWorld(), TargetTransform.GetLocation(), 50.0f, 16, FColor::Emerald, false, 1.0f, 1, 1.0f);
-
-	//UpdateWheelRotations(CurrentSpeed, TargetTransform, DeltaTime, this->GetActorRightVector(), CombinedLocation);
 }
 
 FVector ABaseTrafficVehicle::CalculateCOM()
 {
 	FVector CenterOfMass = FVector::ZeroVector;
-
-	UE_LOG(LogTemp, Log, TEXT("BaseTrafficVehicle CalculateCOM Start: %s"), *CenterOfMass.ToString());
 
 	for (int i = 0; i < VehicleDynamicsStruct.WheelOffsets.Num(); i++)
 	{
@@ -535,10 +510,26 @@ FVector ABaseTrafficVehicle::CalculateCOM()
 	}
 
 	CenterOfMass = CenterOfMass * 0.25;
-
-	UE_LOG(LogTemp, Log, TEXT("BaseTrafficVehicle CalculateCOM End: %s"), *CenterOfMass.ToString());
-
 	return CenterOfMass;
+}
+
+//Update our wheel rotations for cheap animation. We can probably optimise this and do the wheel roll rotation once per frame then use it for all wheels.
+void ABaseTrafficVehicle::UpdateWheelRotation(int InWheelID, float InDeltaTime, FVector InVehicleLocation)
+{
+	WheelRotationDelta += (CurrentSpeed / (PreCalculatedWheelCircumference * 0.01f)) * 360.0f * InDeltaTime; // degrees
+
+	SteerAngle = FVector::DotProduct(this->GetActorRightVector(), (FVector(InVehicleLocation.X, InVehicleLocation.Y, 0.0f) - FVector(TargetLocation.X, TargetLocation.Y, 0.0f)).GetSafeNormal());
+	SteerAngle = SteerAngle * VehicleDynamicsStruct.WheelMask[InWheelID];
+
+	//DrawDebugLine(GetWorld(), InVehicleLocation, TargetLocation, FColor::Emerald, false, 1.0f, 1, 2.0f);
+	//DrawDebugLine(GetWorld(), InVehicleLocation, InVehicleLocation + (this->GetActorRightVector() * 500.0f), FColor::Red, false, 1.0f, 1, 2.0f);
+
+	FRotator SteerRotation = FRotator(0.0f, FMath::RadiansToDegrees(-SteerAngle), 0.0f);
+	FRotator SpinRotation = FRotator(-WheelRotationDelta, 0.0f, 0.0f);
+	FQuat FinalQuat = FQuat(SteerRotation) * FQuat(SpinRotation);
+
+	WheelMeshes[InWheelID]->SetRelativeRotation(FinalQuat);
+
 }
 
 

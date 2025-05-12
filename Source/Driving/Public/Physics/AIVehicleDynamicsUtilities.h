@@ -31,6 +31,12 @@ struct FVehicleDynamicsData
 		FVector(1.0f,1.0f,1.0f)
 	};
 
+	UPROPERTY(EditAnywhere, Category = "WheelData")
+	TArray<int> WheelMask =
+	{
+		1,1,0,0
+	};
+
 	UPROPERTY(EditAnywhere, Category = "Visual Meshes")
 	TSoftObjectPtr<UStaticMesh> WheelMeshes;
 
@@ -69,6 +75,13 @@ struct FVehicleDynamicsData
 
 	UPROPERTY(EditAnywhere, Category = "Dynamics")
 	float IntertialTensorScale = 1.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	FVector VehicleExtends = FVector(200, 100, 50);
+
+	UPROPERTY(EditAnywhere, Category = "Debug")
+	FVector VehicleExtendsOffset = FVector(200, 100, 50);
+
 };
 
 

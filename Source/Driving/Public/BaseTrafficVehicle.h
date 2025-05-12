@@ -89,6 +89,9 @@ public:
 	UFUNCTION()
 	FVector CalculateCOM();
 
+	UFUNCTION()
+	void UpdateWheelRotation(int InWheelID, float InDeltaTime, FVector InVehicleLocation);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -128,6 +131,12 @@ public:
 
 	UPROPERTY(VisibleAnywhere)
 	TArray<TObjectPtr<UStaticMeshComponent>> WheelMeshes;
+	UPROPERTY(VisibleAnywhere)
+	float WheelRotationDelta = 0.0f;
+	UPROPERTY(VisibleAnywhere)
+	float SteerAngle = 0.0f;
+	UPROPERTY(VisibleAnywhere)
+	float PreCalculatedWheelCircumference = 100.0f;
 
 	UPROPERTY(EditAnywhere)
 	TArray<FWheelData> WheelData; //CAN DEP
@@ -248,6 +257,10 @@ public:
 	UPROPERTY(EditAnywhere)
 	float IntertialTensorScale = 1.0f;
 	FQuat ActorRotation;
+	UPROPERTY()
+	FVector PreviousLocation; //Store the previous Frame Delta so we can update our speed
+	UPROPERTY()
+	float CurrentSpeed;
 
 	//Physics Debug
 	UPROPERTY(EditAnywhere)
