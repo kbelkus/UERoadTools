@@ -112,7 +112,10 @@ void ATrafficManager::InitialiseTrafficAgents()
 			NewTrafficAgent->PositionAlongSplineLength = 0.0;
 			NewTrafficAgent->VehicleSpeed = 800.0f;
 			NewTrafficAgent->VehicleBodyMesh->SetStaticMesh(TrafficLibrary[0]->VehicleBodyMesh->GetStaticMesh());
-			NewTrafficAgent->SetSpawnLocation();	
+			
+			bool IsValidSpawn = false;
+
+			NewTrafficAgent->SetSpawnLocation(IsValidSpawn);
 		}
 
 		//TrafficAgent

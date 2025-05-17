@@ -11,7 +11,6 @@
 DECLARE_STATS_GROUP(TEXT("EditorRoadTools"), STATGROUP_EditorRoadTools, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("BuildJunction"), STAT_BuildJunction, STATGROUP_EditorRoadTools);
 
-
 // Sets default values
 AJunctionSurface::AJunctionSurface()
 {
@@ -1018,7 +1017,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 			FJunctionTurningLane NewTurningLane;
 
-			NewTurningLane.TurningLaneID = j;
+			NewTurningLane.TurningLaneID = i;
 			NewTurningLane.TurningLanePoints = BezierPoints;
 			NewTurningLane.TurningLanePointNormal = BezierNormals;
 
@@ -1767,14 +1766,11 @@ void AJunctionSurface::DrawRoadPoints()
 {
 	if (JunctionCenterPoints.Num() != 0)
 	{
-		
 		//FlushPersistentDebugLines(GetWorld());
 
 		for (int i = 0; i < JunctionCenterPoints.Num(); i++)
 		{
-			
 			DrawDebugPoint(GetWorld(), JunctionCenterPoints[i], 20.0f, FColor::Red, true, -1.0f, 10);
-
 		}
 		
 	}
@@ -1840,6 +1836,7 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 						TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 						NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+						NewLaneSpline->LaneDirection = 0;
 						SplineComponent->ClearSplinePoints();
 						SplineComponent->AddPoints(CurrentLanePoints, true);
 
@@ -1903,6 +1900,7 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 			TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 			NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+			NewLaneSpline->LaneDirection = TurningLane.TurningLaneID;
 			SplineComponent->ClearSplinePoints();
 			SplineComponent->AddPoints(CurrenetTurningLanePoints, true);
 			SplineComponent->EditorUnselectedSplineSegmentColor = JunctionColorCodes[TurningLane.TurningLaneID];
@@ -1937,7 +1935,10 @@ TArray<FSplinePoint> AJunctionSurface::ConvertLocationsToSplinePoints(TArray<FVe
 
 TArray<FSplinePoint> AJunctionSurface::CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint)
 {
-	
+	//Note: We need to somehow read the sampling of the lane formatation here and mimic that maths so we can bend the traffic spline
+	//FJunctionLaneData -> Lane Forming Strength
+	//	float Width = Lanes[j].LaneWidth * (FMath::Clamp(MathHelperFunctions::EaseInOutQuad(StartWidth, EndWidth, UValue) + (1.0 - Lanes[j].LaneFormingStrength), 0.0f, 1.0f));
+
 	TArray<FSplinePoint> LanePoints;
 
 	//const float SplineLength = InJunctionLength;
@@ -1954,9 +1955,11 @@ TArray<FSplinePoint> AJunctionSurface::CreateLanePoints(const int InResolution, 
 		UE_LOG(LogTemp, Log, TEXT("Last Point of the CenterLine Location %s"), *CenterLinePointMaxDist.ToString());
 
 		//Get our Offset across Lane Section <-- Handle Turning Lanes here
+		//This is our slice across the lane at this profile
 		for (int j = 0; j < LaneID + 1; j++)
 		{
-			TotalOffsetForLane += (InLaneArray[j].LaneWidth);
+			float SliceWidth = InLaneArray[j].LaneWidth * (FMath::Clamp(MathHelperFunctions::EaseInOutQuad(InLaneArray[j].Start, InLaneArray[j].End, IncrementDistance * i) + (1.0 - InLaneArray[j].LaneFormingStrength), 0.0f, 1.0f));
+			TotalOffsetForLane += (SliceWidth);
 			UE_LOG(LogTemp, Log, TEXT("Offset for Lane at lane id: %i Width is: %f   Accumulated Width is %f"), j, InLaneArray[j].LaneWidth, TotalOffsetForLane);
 		}
 

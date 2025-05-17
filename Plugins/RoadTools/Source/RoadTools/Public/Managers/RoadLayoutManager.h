@@ -9,6 +9,44 @@
 
 class ALaneSpline;
 
+USTRUCT(BlueprintType)
+struct FRoadNetworkLanes
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TSoftObjectPtr<ALaneSpline> LaneSpline;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	float SplineLength;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FBox BoundingBox;
+
+	FRoadNetworkLanes()
+	{
+	}
+
+};
+
+USTRUCT(BlueprintType)
+struct FVehicleSpawnPoints
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FVector SpawnLocation = FVector(0, 0, 0);
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRotator SpawnRotation = FRotator::ZeroRotator;
+
+	FVehicleSpawnPoints()
+	{
+	}
+
+};
+
+
 UCLASS()
 class ROADTOOLS_API ARoadLayoutManager : public AActor
 {
@@ -20,6 +58,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	float SplineSearchDistance = 100.0f;
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<FRoadNetworkLanes> LaneSplines;
 
 
 protected:
@@ -37,6 +78,24 @@ public:
 	TArray<ALaneSpline*> GetAllSceneSplines(UWorld* InWorldContext);
 
 	UFUNCTION()
+	TArray<FRoadNetworkLanes> BuildRoadNetworkSceneData(TArray<ALaneSpline*> InLaneSplines);
+
+	UFUNCTION()
 	void ConnectAllLaneSplines(TArray<ALaneSpline*> InLaneSplines);
+
+	UFUNCTION()
+	FRoadNetworkLanes GetRoadSplineData(int InID);
+
+	UFUNCTION()
+	ALaneSpline* LoadLaneSpline(FRoadNetworkLanes InRoadNetworkLane);
+
+	UFUNCTION()
+	FRoadNetworkLanes GetNearestRoadSpline(const FVector InLocation, bool& FoundSpline, float& NearestDistanceAlongSpline);
+
+	//Debug Functions for Testing
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Debug Tests")
+	FVector InTestLocation;
+	UFUNCTION(CallInEditor, Category="Debug Tests")
+	void TestGetNearestLaneSplineLocation();
 
 };

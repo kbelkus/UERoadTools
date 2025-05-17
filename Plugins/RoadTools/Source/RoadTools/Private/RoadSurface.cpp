@@ -19,7 +19,6 @@ ARoadSurface::ARoadSurface()
 	LaneMarkingSurface = CreateDefaultSubobject<UProceduralMeshComponent>("LaneMarkings");
 	LaneMarkingSurface->SetupAttachment(GetRootComponent());
 
-
 	CenterSpline = CreateDefaultSubobject<USplineComponent>("CenterSpline");
 	CenterSpline->SetupAttachment(RoadSurface);
 
@@ -36,15 +35,6 @@ void ARoadSurface::OnConstruction(const FTransform& RootTransform)
 	//3. Set them as vertices
 
 	int pointCount = RoadPoints.Num();
-
-	//UE_LOG(LogTemp, Warning, TEXT("Road Point Count: %d"), pointCount);
-
-	//Run our Functions to Create our Data for our Spline
-	//PointsAlongSpline(0.0, CenterSpline->GetSplineLength());
-	//GenerateMeshPoints();
-	//GenerateTriangles();
-
-
 
 	if (EditorMode == true && UseAdvancedRoadDesigner == false)
 	{
@@ -623,6 +613,7 @@ void ARoadSurface::BuildAndUpdateLaneSplines()
 					TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 					NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+					NewLaneSpline->LaneDirection = 0;
 
 					SplineComponent->ClearSplinePoints();
 					SplineComponent->AddPoints(CurrentLanePoints, true);
@@ -654,6 +645,7 @@ void ARoadSurface::BuildAndUpdateLaneSplines()
 					TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 					NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+					NewLaneSpline->LaneDirection = 1;
 					SplineComponent->ClearSplinePoints();
 					SplineComponent->AddPoints(CurrentLanePoints, true);
 					
