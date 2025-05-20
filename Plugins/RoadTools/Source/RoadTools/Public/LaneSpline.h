@@ -25,6 +25,13 @@ struct FLaneConnections
 	}
 };
 
+UENUM(BlueprintType)
+enum class ELaneSplineType : uint8
+{
+	ROAD = 0 UMETA(DisplayName = "Road"),
+	JUNCTION = 1  UMETA(DisplayName = "Junction"),
+	PARKING = 2     UMETA(DisplayName = "Parking"),
+};
 
 UCLASS()
 class ROADTOOLS_API ALaneSpline : public AActor
@@ -56,7 +63,6 @@ protected:
 
 	TArray<FColor> LaneStatusColors = { FColor::Red, FColor::Green, FColor::Blue };
 
-
 public:	
 
 	//EDITOR PROPERTIES
@@ -79,11 +85,15 @@ public:
 	TArray<FLaneConnections> LaneConnections;
 	UPROPERTY(EditAnywhere)
 	int LaneDirection = 0;
+	UPROPERTY(EditAnywhere)
+	TArray<int> SignalActivePhase;
 	
 	//SET BY TRAFFIC LIGHT
 	UPROPERTY(EditAnywhere)
 	int LaneStatus = 1; //0 = stop 1 = go 2 = ??
 
+	UPROPERTY(EditAnywhere)
+	ELaneSplineType LaneSplineType = ELaneSplineType::ROAD;
 
 	FVector LaneStartPosition;
 

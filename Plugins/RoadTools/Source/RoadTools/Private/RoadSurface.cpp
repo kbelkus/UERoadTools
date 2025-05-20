@@ -721,7 +721,6 @@ void ARoadSurface::ProjectSplinePoints()
 		return;
 	}
 
-
 	//For Each Point in our Spline, project it down until it hits something
 	for (int i = 0; i < CenterSpline->GetNumberOfSplinePoints(); i++)
 	{
@@ -731,8 +730,6 @@ void ARoadSurface::ProjectSplinePoints()
 		FCollisionObjectQueryParams ObjectParams;
 
 		TEnumAsByte<ECollisionChannel> TraceChannelProperty = ECC_WorldStatic;
-
-
 
 		FVector StartLocation = CenterSpline->GetWorldLocationAtSplinePoint(i) - FVector(0,0,-1.0f);
 		FVector DownLocation = StartLocation + (FVector(0, 0, -1) * 10000.0f);

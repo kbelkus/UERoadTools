@@ -3,6 +3,8 @@
 #include "JunctionSignalController.h"
 #include "DrawDebugHelpers.h"
 #include "Runtime/Engine/Classes/Components/SceneComponent.h"
+#include "JunctionSurface.h"
+#include "LaneSpline.h"
 
 // Sets default values
 AJunctionSignalController::AJunctionSignalController()
@@ -10,21 +12,17 @@ AJunctionSignalController::AJunctionSignalController()
  	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	//SceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("SceneComponent"));
-	//SetRootComponent(SceneComponent);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
+	SetRootComponent(RootComponent);
 
 }
 
 void AJunctionSignalController::OnConstruction(const FTransform& Transform)
 {
-
 	Super::OnConstruction(Transform);
 
 	Center = this->GetActorLocation();
 	Extent = this->GetActorScale();
-
-	//Draw Debug Object
-
 
 	if (DrawDebug)
 	{
@@ -179,6 +177,62 @@ void AJunctionSignalController::UpdateAllConnectedJunctions()
 
 }
 
+void AJunctionSignalController::RebuildSignalController()
+{
+	if (ConnectedJunctionSurface == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("JunctionSignalController could not be built, there is no attached controller, please add one to: %s"), *this->GetName());
+		return;
+	}
+
+	TObjectPtr<AJunctionSurface> JunctionSurface = ConnectedJunctionSurface.LoadSynchronous();
+	Phases.Empty();
+
+	if (JunctionSurface)
+	{
+		//Get All Related Splines
+		TArray<TObjectPtr<ALaneSpline>> RelatedLaneSplines;
+
+		for (TSoftObjectPtr<ALaneSpline> LaneSpline : JunctionSurface->GeneratedLaneSplines)
+		{
+			TObjectPtr<ALaneSpline> LoadedLaneSpline = LaneSpline.LoadSynchronous();
+
+			if (LoadedLaneSpline && LoadedLaneSpline->LaneSplineType == ELaneSplineType::JUNCTION)
+			{
+				RelatedLaneSplines.Add(LoadedLaneSpline);
+			}
+		}
+
+		int MaximumPhaseCount = GetMaximumPhaseCount(JunctionSurface);
+		//Bundle Them into their correct categories
+
+		UE_LOG(LogTemp, Log, TEXT("Junction Signal Controller has this many phases: %i"), MaximumPhaseCount);
+
+		//Rebuild The Signal Controller Phases!
+		for (int i = 0; i < MaximumPhaseCount; i++)
+		{
+			FSignalPhase NewSignalPhase;
+			NewSignalPhase.PhaseLength = 20.0f; //MOVE THIS
+
+			for (TObjectPtr<ALaneSpline> CurrentSpline : RelatedLaneSplines)
+			{
+				if (CurrentSpline->SignalActivePhase.Contains(i))
+				{
+					NewSignalPhase.LaneGroupProceed.Add(CurrentSpline);
+				}
+				else
+				{
+					NewSignalPhase.LaneGroupStop.Add(CurrentSpline);
+				}
+			}
+
+			Phases.Add(NewSignalPhase);
+		}
+	}
+
+	return;
+}
+
 
 //During Gameplay Update Lanes
 void AJunctionSignalController::UpdateLanes(int Phase)
@@ -250,7 +304,7 @@ void AJunctionSignalController::Tick(float DeltaTime)
 	{
 		UpdateSignals = false;
 
-		int NextPhase = (PhaseIndex + 1) % 3;
+		int NextPhase = (PhaseIndex + 1) % Phases.Num();
 		PhaseIndex = NextPhase;
 		UpdateLanes(PhaseIndex);
 		DebugPhaseIndex = PhaseIndex;
@@ -258,8 +312,39 @@ void AJunctionSignalController::Tick(float DeltaTime)
 		DrawPhaseDebug();
 
 		UE_LOG(LogTemp, Warning, TEXT("Junction Signal Controller: Update Signal Timer %i"), PhaseIndex);
-		GetWorld()->GetTimerManager().SetTimer(PhaseTimeHandle, this, &AJunctionSignalController::UpdatePhaseTimer, 8.0f, false);
+		GetWorld()->GetTimerManager().SetTimer(PhaseTimeHandle, this, &AJunctionSignalController::UpdatePhaseTimer, Phases[PhaseIndex].PhaseLength, false);
 	}
 
 }
 
+//Loop through each phase value and get max
+int AJunctionSignalController::GetMaximumPhaseCount(AJunctionSurface* InConnectedJunctionSurface)
+{
+	int MaximumPhaseCount = 0;
+
+	for (int i = 0; i < InConnectedJunctionSurface->JunctionPoints.Num(); i++)
+	{
+		for (int j = 0; j < InConnectedJunctionSurface->JunctionPoints[i].LeftLanes.Num(); j++)
+		{
+			if (!InConnectedJunctionSurface->JunctionPoints[i].LeftLanes[j].SignalActivePhase.IsEmpty())
+			{
+				MaximumPhaseCount = FMath::Max(MaximumPhaseCount, InConnectedJunctionSurface->JunctionPoints[i].LeftLanes[j].SignalActivePhase[0]);
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Junction Surface:: GetMaximumPhaseCount - Junction Point %i has no signal phase set"), i);
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("This junction has a maximum phase count of: %i"), MaximumPhaseCount);
+
+	//Do this to stop any accidental access issues
+	if (MaximumPhaseCount == 0)
+	{
+		return 0;
+	}
+
+
+	return MaximumPhaseCount + 1;
+}

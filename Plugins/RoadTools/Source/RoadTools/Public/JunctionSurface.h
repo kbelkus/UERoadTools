@@ -9,6 +9,7 @@
 
 class UProceduralMeshComponent;
 class ALaneSpline;
+class AJunctionSignalController;
 
 UENUM(BlueprintType)
 enum class ELaneTurningOptions : uint8
@@ -84,6 +85,9 @@ struct FJunctionLaneData
 	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(EditAnywhere)
 	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
+	//Which phase in our junction signal should this lane be active? Eventually this will come from the signal designer
+	UPROPERTY(EditAnywhere)
+	TArray<int> SignalActivePhase;
 
 	FJunctionLaneData()
 	{
@@ -112,6 +116,8 @@ struct FJunctionTurningLanePoint
 	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
 	UPROPERTY(VisibleAnywhere)
 	FVector ForwardVector;
+	UPROPERTY(VisibleAnywhere)
+	TArray<int> SignalActivePhase;
 
 	FJunctionTurningLanePoint()
 	{
@@ -130,6 +136,8 @@ struct FJunctionTurningLane
 	TArray<FVector> TurningLanePoints;
 	UPROPERTY(VisibleAnywhere)
 	TArray<FVector>  TurningLanePointNormal;
+	UPROPERTY(VisibleAnywhere)
+	TArray<int> SignalActivePhase;
 
 	FJunctionTurningLane()
 	{
@@ -363,6 +371,9 @@ struct FCapPoints
 	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(EditAnywhere)
 	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
+	UPROPERTY(EditAnywhere)
+	TArray<int> SignalActivePhase;
+
 
 	FCapPoints()
 	{
@@ -537,6 +548,16 @@ protected:
 	//Editor Build Options
 	UFUNCTION(CallInEditor)
 	void BuildAndUpdateLaneSplines();
+	UFUNCTION()
+	void UpdateConnectedSignalController();
+	UFUNCTION()
+	TArray<ALaneSpline*> GetAllJunctionSplines();
+	//UFUNCTION(CallInEditor)
+	//int GetMaximumPhaseCount();
+
+	UFUNCTION(CallInEditor)
+	void DisplayDebugInformation();
+
 
 	UFUNCTION()
 	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint); //Create Points to feed into the lanespline
@@ -555,6 +576,7 @@ protected:
 	//Points to describe where in worldspace does the Volume of the junction exist
 	UPROPERTY(EditAnywhere)
 	TArray<FVector> JunctionVolumePoints;
+
 
 public:	
 	// Called every frame
@@ -645,7 +667,6 @@ public:
 	UPROPERTY(EditAnywhere)
 	int VertexIndexTest = 0;
 
-
 	UFUNCTION()
 	void BuildJunction();
 
@@ -658,5 +679,9 @@ public:
 
 	UPROPERTY(EditAnywhere)
 	float DistanceBetweenPoints = 1000.0f;
+
+	//Optional Signal Controller 
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<AJunctionSignalController> ConnectedSignalController;
 
 };

@@ -7,6 +7,7 @@
 #include "DrawDebugHelpers.h"
 #include "Math/Vector.h"
 #include "LaneSpline.h"
+#include "JunctionSignalController.h"
 
 DECLARE_STATS_GROUP(TEXT("EditorRoadTools"), STATGROUP_EditorRoadTools, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("BuildJunction"), STAT_BuildJunction, STATGROUP_EditorRoadTools);
@@ -142,6 +143,7 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 						NewPoint.TurningRule = JunctionPoints[i].LeftLanes[p].TurningRule;
 						NewPoint.RoadType = JunctionPoints[i].LeftLanes[p].RoadType;
 						//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
+						NewPoint.SignalActivePhase = JunctionPoints[i].LeftLanes[p].SignalActivePhase;
 
 						LeftHandPoints.Add(NewPoint);
 
@@ -166,6 +168,9 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 					CurrentJunctionPoints.Append(LeftHandPoints);
 					CurrentJunctionPoints.Add(CenterPoint);
 					JunctionCenterLineEndPoint.Add(CenterPoint);
+
+					
+
 				}
 
 				//RIGHT LANES
@@ -743,7 +748,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 
 	UE_LOG(LogTemp, Log, TEXT("Rebuilding Turning Lanes"));
 
-	TArray<FJunctionTurningLanePoint>CreatedTurningLanePoints;
+	TArray<FJunctionTurningLanePoint> CreatedTurningLanePoints;
 	TArray<FJunctionTurningLanePoint> StartPoints;
 	TArray<FJunctionTurningLanePoint> EndPoints;
 	TurningLaneConnections.Empty();
@@ -790,6 +795,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 			NewTurningLanePoint.TurningRule = CurrentLane.TurningRule;
 			NewTurningLanePoint.Location = CurrentLaneCenterLocation;
 			NewTurningLanePoint.ForwardVector = CurrentJunctionForward;
+			NewTurningLanePoint.SignalActivePhase = CurrentLane.SignalActivePhase;
 
 			//If the Lane Type is Driving, add it to our list
 			if (CurrentLane.RoadType == ELaneDrivingType::DRIVING)
@@ -1020,6 +1026,7 @@ void AJunctionSurface::CreateTurningLanePoints()
 			NewTurningLane.TurningLaneID = i;
 			NewTurningLane.TurningLanePoints = BezierPoints;
 			NewTurningLane.TurningLanePointNormal = BezierNormals;
+			NewTurningLane.SignalActivePhase = TurningLaneConnections[i].StartPoint.SignalActivePhase;
 
 			TurningLanes.Add(NewTurningLane);
 		}
@@ -1712,6 +1719,7 @@ void AJunctionSurface::GenerateJunctionPoints()
 			JunctionPoint.RoadID = i;
 			JunctionPoint.Location = PointPositions[j];
 			JunctionPoint.JunctionType = JunctionType;
+			
 
 			FVector JunctionPointCenter = PointPositions[j] - Location;
 			JunctionPoint.AngleFromCenter = FMath::Atan2(JunctionPointCenter.Y, JunctionPointCenter.X);
@@ -1837,6 +1845,7 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 
 						NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
 						NewLaneSpline->LaneDirection = 0;
+						NewLaneSpline->LaneSplineType = ELaneSplineType::ROAD;
 						SplineComponent->ClearSplinePoints();
 						SplineComponent->AddPoints(CurrentLanePoints, true);
 
@@ -1867,6 +1876,7 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 						TObjectPtr<USplineComponent> SplineComponent = NewLaneSpline->LaneSpline;
 
 						NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
+						NewLaneSpline->LaneSplineType = ELaneSplineType::ROAD;
 						SplineComponent->ClearSplinePoints();
 						SplineComponent->AddPoints(CurrentLanePoints, true);
 
@@ -1901,16 +1911,26 @@ void AJunctionSurface::BuildAndUpdateLaneSplines()
 
 			NewLaneSpline->SetActorLocation(SpawnTransform.GetLocation());
 			NewLaneSpline->LaneDirection = TurningLane.TurningLaneID;
+			NewLaneSpline->LaneSplineType = ELaneSplineType::JUNCTION;
+			NewLaneSpline->SignalActivePhase = TurningLane.SignalActivePhase; //NO DATA HERE YET
+			
+
 			SplineComponent->ClearSplinePoints();
 			SplineComponent->AddPoints(CurrenetTurningLanePoints, true);
 			SplineComponent->EditorUnselectedSplineSegmentColor = JunctionColorCodes[TurningLane.TurningLaneID];
 			
-
 			GeneratedLaneSplines.Add(NewLaneSpline);
 		}
 	}
 
+
+	//Update the Signal Controller will save my poor fingers from constantly doing this manually...
+	if (ConnectedSignalController != nullptr)
+	{
+		UpdateConnectedSignalController();
+	}
 }
+
 
 TArray<FSplinePoint> AJunctionSurface::ConvertLocationsToSplinePoints(TArray<FVector> InLocations, FVector OffsetPoint)
 {
@@ -1994,5 +2014,60 @@ TArray<FSplinePoint> AJunctionSurface::CreateLanePoints(const int InResolution, 
 
 void AJunctionSurface::CreateLaneSpline(const TArray<FVector> InSplinePoints)
 {
+
+}
+
+//DEP ALL BELOW HERE BECAUSE THERES NO NEED -> 
+
+//If there is a connected signal controller update all the lane splines and their phases
+void AJunctionSurface::UpdateConnectedSignalController()
+{
+	TObjectPtr<AJunctionSignalController> SignalController = ConnectedSignalController.LoadSynchronous();
+
+	if (SignalController)
+	{
+		//Clear Signal Controller Splines. Get all junction Types in an array. Set them as phase category. Profit.
+		TArray<ALaneSpline*> JunctionLaneSplines = GetAllJunctionSplines();
+
+		//int MaximumPhaseCount = GetMaximumPhaseCount();
+
+	}
+}
+
+TArray<ALaneSpline*> AJunctionSurface::GetAllJunctionSplines()
+{
+	return TArray<TObjectPtr<ALaneSpline>>();
+}
+
+//Loop through each phase value and get max
+//int AJunctionSurface::GetMaximumPhaseCount()
+//{
+//	int MaximumPhaseCount = 0;
+//
+//
+//	for (int i = 0; i < JunctionPoints.Num(); i++)
+//	{
+//		for (int j = 0; j < JunctionPoints[i].LeftLanes.Num(); j++)
+//		{
+//			if (!JunctionPoints[i].LeftLanes[j].SignalActivePhase.IsEmpty())
+//			{
+//				MaximumPhaseCount = FMath::Max(MaximumPhaseCount, JunctionPoints[i].LeftLanes[j].SignalActivePhase[0]);
+//			}
+//			else
+//			{
+//				UE_LOG(LogTemp, Error, TEXT("Junction Surface:: GetMaximumPhaseCount - Junction Point %i has no signal phase set"), i);
+//			}
+//		}
+//	}
+//
+//	UE_LOG(LogTemp, Log, TEXT("This junction has a maximum phase count of: %i"), MaximumPhaseCount);
+//
+//	return MaximumPhaseCount;
+//}
+
+
+void AJunctionSurface::DisplayDebugInformation()
+{
+	//int MaxPhase = GetMaximumPhaseCount();
 
 }

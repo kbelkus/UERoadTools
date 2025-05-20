@@ -7,6 +7,9 @@
 #include "GameFramework/Actor.h"
 #include "JunctionSignalController.generated.h"
 
+class AJunctionSurface;
+
+
 USTRUCT()
 struct FSignalPhase
 {
@@ -23,9 +26,7 @@ struct FSignalPhase
 	{
 
 	}
-
 };
-
 
 USTRUCT()
 struct FSignalDebugRenderer
@@ -44,8 +45,6 @@ struct FSignalDebugRenderer
 
 	}
 };
-
-
 
 
 UCLASS()
@@ -75,6 +74,7 @@ public:
 
 	//UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	//class USceneComponent* SceneComponent;
+
 	UPROPERTY(EditAnywhere)
 	TArray<FSignalPhase> Phases;
 
@@ -84,10 +84,11 @@ public:
 	FVector Center;
 	FVector Extent;
 
-
 	UFUNCTION()
 	void UpdateAllConnectedJunctions();
-
+	UFUNCTION(CallInEditor)
+	void RebuildSignalController();
+	
 	float GlobalTime;
 	float PhaseTimer = 0.0f; //How many seconds into the phase are we
 	int PhaseIndex = 0;		 //Which index of the phase are we in
@@ -104,6 +105,8 @@ public:
 	UFUNCTION()
 	void DrawLaneDebugPoints();
 
+	UFUNCTION()
+	int GetMaximumPhaseCount(AJunctionSurface* InConnectedJunctionSurface);
 
 	UFUNCTION()
 	void UpdateLanes(int Phase);
@@ -126,6 +129,9 @@ public:
 	bool isEnabled;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector DebugSignalHeight = FVector(0,0,400.0f);
+
+	UPROPERTY(EditAnywhere)
+	TSoftObjectPtr<AJunctionSurface> ConnectedJunctionSurface;
 
 
 	virtual void OnConstruction(const FTransform& Transform) override;
