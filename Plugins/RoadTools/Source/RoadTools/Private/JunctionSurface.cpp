@@ -8,6 +8,7 @@
 #include "Math/Vector.h"
 #include "LaneSpline.h"
 #include "JunctionSignalController.h"
+#include "JunctionSurfaceComponent.h"
 
 DECLARE_STATS_GROUP(TEXT("EditorRoadTools"), STATGROUP_EditorRoadTools, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("BuildJunction"), STAT_BuildJunction, STATGROUP_EditorRoadTools);
@@ -29,6 +30,9 @@ AJunctionSurface::AJunctionSurface()
 
 	//TurningLanesSurface = CreateDefaultSubobject<UProceduralMeshComponent>("TurningLanesSurface");
 	//TurningLanesSurface->SetupAttachment(GetRootComponent());
+	//Component Visualizer
+	JunctionComponent = CreateDefaultSubobject<UJunctionSurfaceComponent>("JunctionSurfaceComponent");
+
 }
 
 void AJunctionSurface::BuildJunction()
@@ -42,306 +46,245 @@ void AJunctionSurface::OnConstruction(const FTransform& RootTransform)
 {
 
 	Super::OnConstruction(RootTransform);
-	{
-		SCOPE_CYCLE_COUNTER(STAT_BuildJunction);
-
-	//Mode for when artists want to manually create a junction 
-		if (ManualEditMode == true)
-		{
-			FlushPersistentDebugLines(GetWorld());
-
-			JunctionSurface->ClearAllMeshSections();
-			JunctionCenterSurface->ClearAllMeshSections();
-			LaneMarkingsSurface->ClearAllMeshSections();
-			//TurningLanesSurface->ClearAllMeshSections();
+	//{
+		//SCOPE_CYCLE_COUNTER(STAT_BuildJunction);
+
+	RebuildJunctionGeometry();
+
+	////Mode for when artists want to manually create a junction 
+	//	if (ManualEditMode == true)
+	//	{
+	//		FlushPersistentDebugLines(GetWorld());
+
+	//		JunctionSurface->ClearAllMeshSections();
+	//		JunctionCenterSurface->ClearAllMeshSections();
+	//		LaneMarkingsSurface->ClearAllMeshSections();
+	//		//TurningLanesSurface->ClearAllMeshSections();
 
-			ManualEditInitialiseJunction();
-			//ManualEditDrawJunctionShape();
-
-			int MeshIndex = 0;
-
-			JunctionCapPoints.Empty();
-			JunctionCenterBoundaryPoints.Empty(); //NO NEEDED?
-			JunctionIDSortedPoints.Empty();
-			JunctionCenterLineEndPoint.Empty();
-
-			//For Each Junction
-			for (int i = 0; i < JunctionPoints.Num(); i++)
-			{
-				//Junction Specific Data
-				TArray<FCapPoints> CurrentJunctionPoints;
-				TArray<FCapPoints> TurningLaneCenterPoints;
-
-				//LEFT LANES
-				if (JunctionPoints[i].LeftLanes.Num() != 0)
-				{
-
-					ManualEditCreateLaneBoundaries(JunctionPoints[i].LeftLanes, JunctionPoints[i].CenterLinePoints);
-
-					float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
-
-					for (int j = 0; j < JunctionPoints[i].LeftLanes.Num(); j++)
-					{
-						//Create Geo for Each Junction
-						ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].UVTiling, JunctionPoints[i].LeftLanes[j].UVOffset);
-						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
-
-						//DrawVertices(VertexPositions);
-						JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
-						JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].Material);
-						JunctionSurface->bCastDynamicShadow = false;
-
-						MeshIndex = MeshIndex + 1;
-
-						//FVector TTEmpLocation = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
-						//DrawDebugPoint(GetWorld(), TTEmpLocation, 20.0f, FColor::Orange, true, -1.0f, 5);
+	//		ManualEditInitialiseJunction();
+	//		//ManualEditDrawJunctionShape();
+
+	//		int MeshIndex = 0;
+
+	//		JunctionCapPoints.Empty();
+	//		JunctionCenterBoundaryPoints.Empty(); //NO NEEDED?
+	//		JunctionIDSortedPoints.Empty();
+	//		JunctionCenterLineEndPoint.Empty();
+
+	//		//For Each Junction
+	//		for (int i = 0; i < JunctionPoints.Num(); i++)
+	//		{
+	//			//Junction Specific Data
+	//			TArray<FCapPoints> CurrentJunctionPoints;
+	//			TArray<FCapPoints> TurningLaneCenterPoints;
 
-						//Lane Markings for this Junction
-						if (JunctionPoints[i].LeftLanes[j].LaneMarkings.Num() != 0)
-						{
-							ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingOffset);
-							ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
+	//			//LEFT LANES
+	//			if (JunctionPoints[i].LeftLanes.Num() != 0)
+	//			{
+
+	//				ManualEditCreateLaneBoundaries(JunctionPoints[i].LeftLanes, JunctionPoints[i].CenterLinePoints);
+
+	//				float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
+
+	//				for (int j = 0; j < JunctionPoints[i].LeftLanes.Num(); j++)
+	//				{
+	//					//Create Geo for Each Junction
+	//					ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].UVTiling, JunctionPoints[i].LeftLanes[j].UVOffset);
+	//					ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
+
+	//					//DrawVertices(VertexPositions);
+	//					JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	//					JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].Material);
+	//					JunctionSurface->bCastDynamicShadow = false;
+
+	//					MeshIndex = MeshIndex + 1;
 
-							LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
-							LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingMaterial);
-							LaneMarkingsSurface->bCastDynamicShadow = false;
+	//					//FVector TTEmpLocation = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
+	//					//DrawDebugPoint(GetWorld(), TTEmpLocation, 20.0f, FColor::Orange, true, -1.0f, 5);
 
-						}
-					}
+	//					//Lane Markings for this Junction
+	//					if (JunctionPoints[i].LeftLanes[j].LaneMarkings.Num() != 0)
+	//					{
+	//						ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingOffset);
+	//						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
+
+	//						LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+	//						LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingMaterial);
+	//						LaneMarkingsSurface->bCastDynamicShadow = false;
 
-					//Cap Points
-					TArray<FCapPoints> LeftHandPoints;
-					int BoundaryPointsCount = LaneBoundaryPositions.Num();
-					//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i,BoundaryPointsCount);
+	//					}
+	//				}
 
-					int LaneCount = JunctionPoints[i].LeftLanes.Num();
+	//				//Cap Points
+	//				TArray<FCapPoints> LeftHandPoints;
+	//				int BoundaryPointsCount = LaneBoundaryPositions.Num();
+	//				//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i,BoundaryPointsCount);
 
-					//For our Lane Count, get the last point and add it to the array
-					for (int p = 0; p < JunctionPoints[i].LeftLanes.Num(); p++)
-					{
-						int PointType = 0;
+	//				int LaneCount = JunctionPoints[i].LeftLanes.Num();
 
-						if (p == 0)
-						{
-							PointType = -1;
-						}
+	//				//For our Lane Count, get the last point and add it to the array
+	//				for (int p = 0; p < JunctionPoints[i].LeftLanes.Num(); p++)
+	//				{
+	//					int PointType = 0;
 
-						int PointID = (BoundaryPointsCount - 1) - p;
+	//					if (p == 0)
+	//					{
+	//						PointType = -1;
+	//					}
 
-						FCapPoints NewPoint;
+	//					int PointID = (BoundaryPointsCount - 1) - p;
 
-						NewPoint.JunctionID = i;
-						NewPoint.Location = LaneBoundaryPositions[PointID];
-						NewPoint.PointType = PointType;
-						NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
-						NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
-						NewPoint.AngleFromCenter = 0.0f;
-						NewPoint.PointID = p;
-						NewPoint.OffsetDistance = 0.0f;
-						NewPoint.UValue = 0.0f;
-						NewPoint.LaneDirection = 0;
-						NewPoint.TurningRule = JunctionPoints[i].LeftLanes[p].TurningRule;
-						NewPoint.RoadType = JunctionPoints[i].LeftLanes[p].RoadType;
-						//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
-						NewPoint.SignalActivePhase = JunctionPoints[i].LeftLanes[p].SignalActivePhase;
+	//					FCapPoints NewPoint;
 
-						LeftHandPoints.Add(NewPoint);
+	//					NewPoint.JunctionID = i;
+	//					NewPoint.Location = LaneBoundaryPositions[PointID];
+	//					NewPoint.PointType = PointType;
+	//					NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
+	//					NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+	//					NewPoint.AngleFromCenter = 0.0f;
+	//					NewPoint.PointID = p;
+	//					NewPoint.OffsetDistance = 0.0f;
+	//					NewPoint.UValue = 0.0f;
+	//					NewPoint.LaneDirection = 0;
+	//					NewPoint.TurningRule = JunctionPoints[i].LeftLanes[p].TurningRule;
+	//					NewPoint.RoadType = JunctionPoints[i].LeftLanes[p].RoadType;
+	//					//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
+	//					NewPoint.SignalActivePhase = JunctionPoints[i].LeftLanes[p].SignalActivePhase;
 
-					}
+	//					LeftHandPoints.Add(NewPoint);
 
-					JunctionCapPoints.Append(LeftHandPoints);
+	//				}
 
-					//Append our Center Point here
-					FCapPoints CenterPoint;
+	//				JunctionCapPoints.Append(LeftHandPoints);
 
-					CenterPoint.JunctionID = i;
-					CenterPoint.Location = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
-					CenterPoint.ForwardVector = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].ForwardVector;
-					CenterPoint.PointType = 2;
-					CenterPoint.LaneDirection = 0;
-					CenterPoint.RoadType = JunctionPoints[i].LeftLanes[0].RoadType;
-					CenterPoint.TurningRule = JunctionPoints[i].LeftLanes[0].TurningRule;
-					CenterPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+	//				//Append our Center Point here
+	//				FCapPoints CenterPoint;
 
-					JunctionCapPoints.Add(CenterPoint);
+	//				CenterPoint.JunctionID = i;
+	//				CenterPoint.Location = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
+	//				CenterPoint.ForwardVector = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].ForwardVector;
+	//				CenterPoint.PointType = 2;
+	//				CenterPoint.LaneDirection = 0;
+	//				CenterPoint.RoadType = JunctionPoints[i].LeftLanes[0].RoadType;
+	//				CenterPoint.TurningRule = JunctionPoints[i].LeftLanes[0].TurningRule;
+	//				CenterPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
 
-					CurrentJunctionPoints.Append(LeftHandPoints);
-					CurrentJunctionPoints.Add(CenterPoint);
-					JunctionCenterLineEndPoint.Add(CenterPoint);
+	//				JunctionCapPoints.Add(CenterPoint);
 
-					
+	//				CurrentJunctionPoints.Append(LeftHandPoints);
+	//				CurrentJunctionPoints.Add(CenterPoint);
+	//				JunctionCenterLineEndPoint.Add(CenterPoint);
 
-				}
+	//			}
 
-				//RIGHT LANES
-				if (JunctionPoints[i].RightLanes.Num() != 0)
-				{
-					ManualEditCreateLaneBoundaries(JunctionPoints[i].RightLanes, JunctionPoints[i].CenterLinePoints);
-					float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
+	//			//RIGHT LANES
+	//			if (JunctionPoints[i].RightLanes.Num() != 0)
+	//			{
+	//				ManualEditCreateLaneBoundaries(JunctionPoints[i].RightLanes, JunctionPoints[i].CenterLinePoints);
+	//				float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
 
-					for (int j = 0; j < JunctionPoints[i].RightLanes.Num(); j++)
-					{
+	//				for (int j = 0; j < JunctionPoints[i].RightLanes.Num(); j++)
+	//				{
 
-						//Create Geo for Each Junction
-						ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].UVTiling, JunctionPoints[i].RightLanes[j].UVOffset);
-						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
+	//					//Create Geo for Each Junction
+	//					ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].UVTiling, JunctionPoints[i].RightLanes[j].UVOffset);
+	//					ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
 
-						//DrawVertices(VertexPositions);
-						JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
-						JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].Material);
-						JunctionSurface->bCastDynamicShadow = false;
+	//					//DrawVertices(VertexPositions);
+	//					JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	//					JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].Material);
+	//					JunctionSurface->bCastDynamicShadow = false;
 
-						MeshIndex = MeshIndex + 1;
+	//					MeshIndex = MeshIndex + 1;
 
+	//					//Lane Markings for this Junction
+	//					if (JunctionPoints[i].RightLanes[j].LaneMarkings.Num() != 0)
+	//					{
 
-						//Lane Markings for this Junction
-						if (JunctionPoints[i].RightLanes[j].LaneMarkings.Num() != 0)
-						{
+	//						ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingOffset);
+	//						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
 
-							ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingOffset);
-							ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
+	//						LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+	//						LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingMaterial);
+	//						LaneMarkingsSurface->bCastDynamicShadow = false;
 
-							LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
-							LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingMaterial);
-							LaneMarkingsSurface->bCastDynamicShadow = false;
+	//					}
+	//				}
 
-						}
+	//				//Cap Points
+	//				TArray<FCapPoints> RightHandPoints;
+	//				int BoundaryPointsCount = LaneBoundaryPositions.Num();
+	//				//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i, BoundaryPointsCount);
 
+	//				int LaneCount = JunctionPoints[i].RightLanes.Num();
 
-					}
+	//				//For our Lane Count, get the last point and add it to the array
+	//				for (int p = 0; p < JunctionPoints[i].RightLanes.Num(); p++)
+	//				{
+	//					int PointType = 0;
 
-					//Cap Points
-					TArray<FCapPoints> RightHandPoints;
-					int BoundaryPointsCount = LaneBoundaryPositions.Num();
-					//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i, BoundaryPointsCount);
+	//					if (p == 0)
+	//					{
+	//						PointType = 1;
+	//					}
 
-					int LaneCount = JunctionPoints[i].RightLanes.Num();
+	//					int PointID = (BoundaryPointsCount - 1) - p;
 
-					//For our Lane Count, get the last point and add it to the array
-					for (int p = 0; p < JunctionPoints[i].RightLanes.Num(); p++)
-					{
-						int PointType = 0;
+	//					FCapPoints NewPoint;
 
-						if (p == 0)
-						{
-							PointType = 1;
-						}
+	//					NewPoint.JunctionID = i;
+	//					NewPoint.Location = LaneBoundaryPositions[PointID];
+	//					NewPoint.PointType = PointType;
+	//					NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
+	//					NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+	//					NewPoint.AngleFromCenter = 0.0f;
+	//					NewPoint.PointID = p;
+	//					NewPoint.OffsetDistance = 0.0f;
+	//					NewPoint.UValue = 0.0f;
+	//					NewPoint.LaneDirection = 1;
+	//					NewPoint.TurningRule = JunctionPoints[i].RightLanes[p].TurningRule;
+	//					NewPoint.RoadType = JunctionPoints[i].RightLanes[p].RoadType;
+	//					//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
 
-						int PointID = (BoundaryPointsCount - 1) - p;
+	//					RightHandPoints.Add(NewPoint);
 
-						FCapPoints NewPoint;
+	//				}
 
-						NewPoint.JunctionID = i;
-						NewPoint.Location = LaneBoundaryPositions[PointID];
-						NewPoint.PointType = PointType;
-						NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
-						NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
-						NewPoint.AngleFromCenter = 0.0f;
-						NewPoint.PointID = p;
-						NewPoint.OffsetDistance = 0.0f;
-						NewPoint.UValue = 0.0f;
-						NewPoint.LaneDirection = 1;
-						NewPoint.TurningRule = JunctionPoints[i].RightLanes[p].TurningRule;
-						NewPoint.RoadType = JunctionPoints[i].RightLanes[p].RoadType;
-						//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
+	//				//Sort our Points
+	//				JunctionCapPoints.Append(RightHandPoints);
+	//				CurrentJunctionPoints.Append(RightHandPoints);
 
-						RightHandPoints.Add(NewPoint);
+	//				CurrentJunctionPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
+	//					{
+	//						return A.PointType < B.PointType;
+	//					});
 
-					}
+	//				FJunctionIDPoints NewJunctionSortedPoints;
+	//				NewJunctionSortedPoints.Points = CurrentJunctionPoints;
 
-					//Sort our Points
-					JunctionCapPoints.Append(RightHandPoints);
-					CurrentJunctionPoints.Append(RightHandPoints);
+	//				JunctionIDSortedPoints.Add(NewJunctionSortedPoints);
 
-					CurrentJunctionPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
-						{
-							return A.PointType < B.PointType;
-						});
+	//			}
+	//		}
+	//	}
 
-					FJunctionIDPoints NewJunctionSortedPoints;
-					NewJunctionSortedPoints.Points = CurrentJunctionPoints;
+	//	//CREATE INTERIOR JUNCTION POINTS
 
-					JunctionIDSortedPoints.Add(NewJunctionSortedPoints);
+	//	ManualEditBuildCenterGeo();
+	//	//if (CreateCenterLaneMarkings == true)
+	//	//{
+	//	//	ManualEditBuildGenterMarkings();
+	//	//}
+	//	////Create Traffic Lane Data
+	//	//
+	//	//if (CreateTurningLanes == true)
+	//	//{
+	//	//	CreateTurningLanePoints();
+	//	//}
 
+	//}
 
-					////TURNING LANE CENTER POINTS
-					//FVector CenterLocationPoint = JunctionCenter + this->GetActorLocation();
-					//TurningLaneCenterPoints = CurrentJunctionPoints;
-
-					//for (int p = 0; p < TurningLaneCenterPoints.Num(); p++)
-					//{
-					//	FVector PointLocation = TurningLaneCenterPoints[p].Location - CenterLocationPoint;
-					//	float Angle = FMath::Atan2(PointLocation.Y, PointLocation.X);
-					//	TurningLaneCenterPoints[p].AngleFromCenter = Angle;
-					//}
-
-					////Sort Points by Angle Temp
-					//TurningLaneCenterPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
-					//	{
-					//		return A.AngleFromCenter < B.AngleFromCenter;
-					//	});
-
-					////Turning Lane Points
-					//float tempVal = (1.0 / TurningLaneCenterPoints.Num());
-
-					//for (int g = 0; g < TurningLaneCenterPoints.Num() - 1; g++)
-					//{
-
-					//	FVector CenterOfLane = (TurningLaneCenterPoints[g].Location + TurningLaneCenterPoints[g + 1].Location) * 0.5f;
-
-					//	CenterOfLane = TurningLaneCenterPoints[g].Location;
-
-					//	FJunctionTurningLanePoint TurningLanePoint;
-
-					//	TurningLanePoint.JunctionID = i;
-					//	TurningLanePoint.Location = CenterOfLane;
-					//	TurningLanePoint.LaneDirection = TurningLaneCenterPoints[g + 1].LaneDirection;
-					//	TurningLanePoint.RoadType = TurningLaneCenterPoints[g].RoadType;
-					//	TurningLanePoint.TurningRule = TurningLaneCenterPoints[g].TurningRule;
-
-					//	TurningLanePoints.Add(TurningLanePoint);
-
-					//	int ColorIndex = 0;
-
-					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::DRIVING)
-					//	{
-					//		ColorIndex = 1;
-					//	}
-
-					//	if (TurningLaneCenterPoints[g].RoadType == ELaneDrivingType::SHOULDER)
-					//	{
-					//		ColorIndex = 2;
-					//	}
-
-
-					//	//DrawDebugPoint(GetWorld(), CenterOfLane, 10.0f, JunctionColorCodes[ColorIndex], true, -1.0f, 2);
-
-
-					//}
-
-				}
-
-			}
-
-
-		}
-
-		//CREATE INTERIOR JUNCTION POINTS
-
-		ManualEditBuildCenterGeo();
-		//if (CreateCenterLaneMarkings == true)
-		//{
-		//	ManualEditBuildGenterMarkings();
-		//}
-		////Create Traffic Lane Data
-		//
-		//if (CreateTurningLanes == true)
-		//{
-		//	CreateTurningLanePoints();
-		//}
-
-	}
-
+	//UpdateComponentVisulizer();
 }
 
 //Generate an Axis Aligned Bounds
@@ -1950,6 +1893,292 @@ TArray<FSplinePoint> AJunctionSurface::ConvertLocationsToSplinePoints(TArray<FVe
 
 
 	return ReturnPoints;
+}
+
+void AJunctionSurface::UpdateComponentVisulizer()
+{
+	if (JunctionComponent)
+	{
+		JunctionComponent->JunctionPoints = JunctionPoints;
+		JunctionComponent->JunctionCenterLocation = JunctionCenter;
+	}
+	else
+	{
+		JunctionComponent = this->GetComponentByClass<UJunctionSurfaceComponent>();
+	}
+}
+
+void AJunctionSurface::RebuildJunctionGeometry()
+{
+	{
+		SCOPE_CYCLE_COUNTER(STAT_BuildJunction);
+
+		//Mode for when artists want to manually create a junction 
+		if (ManualEditMode == true)
+		{
+			FlushPersistentDebugLines(GetWorld());
+
+			JunctionSurface->ClearAllMeshSections();
+			JunctionCenterSurface->ClearAllMeshSections();
+			LaneMarkingsSurface->ClearAllMeshSections();
+			//TurningLanesSurface->ClearAllMeshSections();
+
+			ManualEditInitialiseJunction();
+			//ManualEditDrawJunctionShape();
+
+			int MeshIndex = 0;
+
+			JunctionCapPoints.Empty();
+			JunctionCenterBoundaryPoints.Empty(); //NO NEEDED?
+			JunctionIDSortedPoints.Empty();
+			JunctionCenterLineEndPoint.Empty();
+
+			//For Each Junction
+			for (int i = 0; i < JunctionPoints.Num(); i++)
+			{
+				//Junction Specific Data
+				TArray<FCapPoints> CurrentJunctionPoints;
+				TArray<FCapPoints> TurningLaneCenterPoints;
+
+				//LEFT LANES
+				if (JunctionPoints[i].LeftLanes.Num() != 0)
+				{
+
+					ManualEditCreateLaneBoundaries(JunctionPoints[i].LeftLanes, JunctionPoints[i].CenterLinePoints);
+
+					float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
+
+					for (int j = 0; j < JunctionPoints[i].LeftLanes.Num(); j++)
+					{
+						//Create Geo for Each Junction
+						ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].UVTiling, JunctionPoints[i].LeftLanes[j].UVOffset);
+						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
+
+						//DrawVertices(VertexPositions);
+						JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+						JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].Material);
+						JunctionSurface->bCastDynamicShadow = false;
+
+						MeshIndex = MeshIndex + 1;
+
+						//FVector TTEmpLocation = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
+						//DrawDebugPoint(GetWorld(), TTEmpLocation, 20.0f, FColor::Orange, true, -1.0f, 5);
+
+						//Lane Markings for this Junction
+						if (JunctionPoints[i].LeftLanes[j].LaneMarkings.Num() != 0)
+						{
+							ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].LeftLanes.Num(), LaneLength, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingOffset);
+							ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
+
+							LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+							LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].LeftLanes[j].LaneMarkings[0].MarkingMaterial);
+							LaneMarkingsSurface->bCastDynamicShadow = false;
+
+						}
+					}
+
+					//Cap Points
+					TArray<FCapPoints> LeftHandPoints;
+					int BoundaryPointsCount = LaneBoundaryPositions.Num();
+					//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i,BoundaryPointsCount);
+
+					int LaneCount = JunctionPoints[i].LeftLanes.Num();
+
+					//For our Lane Count, get the last point and add it to the array
+					for (int p = 0; p < JunctionPoints[i].LeftLanes.Num(); p++)
+					{
+						int PointType = 0;
+
+						if (p == 0)
+						{
+							PointType = -1;
+						}
+
+						int PointID = (BoundaryPointsCount - 1) - p;
+
+						FCapPoints NewPoint;
+
+						NewPoint.JunctionID = i;
+						NewPoint.Location = LaneBoundaryPositions[PointID];
+						NewPoint.PointType = PointType;
+						NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
+						NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+						NewPoint.AngleFromCenter = 0.0f;
+						NewPoint.PointID = p;
+						NewPoint.OffsetDistance = 0.0f;
+						NewPoint.UValue = 0.0f;
+						NewPoint.LaneDirection = 0;
+						NewPoint.TurningRule = JunctionPoints[i].LeftLanes[p].TurningRule;
+						NewPoint.RoadType = JunctionPoints[i].LeftLanes[p].RoadType;
+						//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
+						NewPoint.SignalActivePhase = JunctionPoints[i].LeftLanes[p].SignalActivePhase;
+
+						LeftHandPoints.Add(NewPoint);
+
+					}
+
+					JunctionCapPoints.Append(LeftHandPoints);
+
+					//Append our Center Point here
+					FCapPoints CenterPoint;
+
+					CenterPoint.JunctionID = i;
+					CenterPoint.Location = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].Location;
+					CenterPoint.ForwardVector = JunctionPoints[i].CenterLinePoints[JunctionPoints[i].CenterLinePoints.Num() - 1].ForwardVector;
+					CenterPoint.PointType = 2;
+					CenterPoint.LaneDirection = 0;
+					CenterPoint.RoadType = JunctionPoints[i].LeftLanes[0].RoadType;
+					CenterPoint.TurningRule = JunctionPoints[i].LeftLanes[0].TurningRule;
+					CenterPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+
+					JunctionCapPoints.Add(CenterPoint);
+
+					CurrentJunctionPoints.Append(LeftHandPoints);
+					CurrentJunctionPoints.Add(CenterPoint);
+					JunctionCenterLineEndPoint.Add(CenterPoint);
+
+				}
+
+				//RIGHT LANES
+				if (JunctionPoints[i].RightLanes.Num() != 0)
+				{
+					ManualEditCreateLaneBoundaries(JunctionPoints[i].RightLanes, JunctionPoints[i].CenterLinePoints);
+					float LaneLength = FVector::Distance(JunctionPoints[i].Location, JunctionPoints[i].EndLocation);
+
+					for (int j = 0; j < JunctionPoints[i].RightLanes.Num(); j++)
+					{
+
+						//Create Geo for Each Junction
+						ManualEditCreateLaneVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].UVTiling, JunctionPoints[i].RightLanes[j].UVOffset);
+						ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), false);
+
+						//DrawVertices(VertexPositions);
+						JunctionSurface->CreateMeshSection(MeshIndex, VertexPositions, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+						JunctionSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].Material);
+						JunctionSurface->bCastDynamicShadow = false;
+
+						MeshIndex = MeshIndex + 1;
+
+						//Lane Markings for this Junction
+						if (JunctionPoints[i].RightLanes[j].LaneMarkings.Num() != 0)
+						{
+
+							ManualEditCreateLaneMarkingVertices(j, JunctionPoints[i].CenterLinePoints.Num(), JunctionPoints[i].RightLanes.Num(), LaneLength, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVTiling, JunctionPoints[i].RightLanes[j].LaneMarkings[0].UVOffset, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingWidth, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingOffset);
+							ManualEditCreateLaneTriangles(JunctionPoints[i].CenterLinePoints.Num(), true);
+
+							LaneMarkingsSurface->CreateMeshSection(MeshIndex, LaneMarkingVertices, TriangleIndices, TArray<FVector>(), UVs, TArray<FColor>(), TArray<FProcMeshTangent>(), false);
+							LaneMarkingsSurface->SetMaterial(MeshIndex, JunctionPoints[i].RightLanes[j].LaneMarkings[0].MarkingMaterial);
+							LaneMarkingsSurface->bCastDynamicShadow = false;
+
+						}
+					}
+
+					//Cap Points
+					TArray<FCapPoints> RightHandPoints;
+					int BoundaryPointsCount = LaneBoundaryPositions.Num();
+					//UE_LOG(LogTemp, Warning, TEXT("JunctionSurface Lane Left Boundary Point Count Junction then Count: %i, %i"), i, BoundaryPointsCount);
+
+					int LaneCount = JunctionPoints[i].RightLanes.Num();
+
+					//For our Lane Count, get the last point and add it to the array
+					for (int p = 0; p < JunctionPoints[i].RightLanes.Num(); p++)
+					{
+						int PointType = 0;
+
+						if (p == 0)
+						{
+							PointType = 1;
+						}
+
+						int PointID = (BoundaryPointsCount - 1) - p;
+
+						FCapPoints NewPoint;
+
+						NewPoint.JunctionID = i;
+						NewPoint.Location = LaneBoundaryPositions[PointID];
+						NewPoint.PointType = PointType;
+						NewPoint.ForwardVector = JunctionPoints[i].ForwardVector; //CHANGE THIS LATER IF THE JUNCTION CAN HAVE A CURVED ROAD
+						NewPoint.RightVector = FVector::CrossProduct(JunctionPoints[i].ForwardVector, FVector(0, 0, 1));
+						NewPoint.AngleFromCenter = 0.0f;
+						NewPoint.PointID = p;
+						NewPoint.OffsetDistance = 0.0f;
+						NewPoint.UValue = 0.0f;
+						NewPoint.LaneDirection = 1;
+						NewPoint.TurningRule = JunctionPoints[i].RightLanes[p].TurningRule;
+						NewPoint.RoadType = JunctionPoints[i].RightLanes[p].RoadType;
+						//DrawDebugPoint(GetWorld(), LaneBoundaryPositions[PointID], 20.0f, JunctionColorCodes[p], true, -1.0f, 5);
+
+						RightHandPoints.Add(NewPoint);
+
+					}
+
+					//Sort our Points
+					JunctionCapPoints.Append(RightHandPoints);
+					CurrentJunctionPoints.Append(RightHandPoints);
+
+					CurrentJunctionPoints.Sort([](const FCapPoints& A, const FCapPoints& B)
+						{
+							return A.PointType < B.PointType;
+						});
+
+					FJunctionIDPoints NewJunctionSortedPoints;
+					NewJunctionSortedPoints.Points = CurrentJunctionPoints;
+
+					JunctionIDSortedPoints.Add(NewJunctionSortedPoints);
+
+				}
+			}
+		}
+
+		//CREATE INTERIOR JUNCTION POINTS
+
+		ManualEditBuildCenterGeo();
+		//if (CreateCenterLaneMarkings == true)
+		//{
+		//	ManualEditBuildGenterMarkings();
+		//}
+		////Create Traffic Lane Data
+		//
+		//if (CreateTurningLanes == true)
+		//{
+		//	CreateTurningLanePoints();
+		//}
+
+	}
+
+	UpdateComponentVisulizer();
+
+}
+
+float AJunctionSurface::GetAccumilatedLaneWidth(FJunctionPoint InJunctionPoint, int LeftRightSelection, int SelectedLaneIndex)
+{
+
+	if (LeftRightSelection == 0 && !InJunctionPoint.LeftLanes.IsEmpty())
+	{
+		float AccumilatedWidth = 0.0f;
+
+		for (int i = 0; i < SelectedLaneIndex + 1; i++)
+		{
+			AccumilatedWidth += InJunctionPoint.LeftLanes[i].LaneWidth;
+		}
+
+		return AccumilatedWidth;
+	}
+
+	if (LeftRightSelection == 1 && !InJunctionPoint.RightLanes.IsEmpty())
+	{
+		float AccumilatedWidth = 0.0f;
+
+		for (int i = 0; i < SelectedLaneIndex + 1; i++)
+		{
+			AccumilatedWidth += InJunctionPoint.RightLanes[i].LaneWidth;
+		}
+
+		return AccumilatedWidth;
+	}
+
+
+	return 0.0f;
 }
 
 

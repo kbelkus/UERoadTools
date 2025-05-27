@@ -46,6 +46,24 @@ struct FSignalDebugRenderer
 	}
 };
 
+USTRUCT(Blueprintable)
+struct FSignalVisuals
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<AStaticMeshActor> RelatedStaticMeshes;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> StaticMeshComponent;
+	UPROPERTY(EditAnywhere)
+	int ActivePhase = 0;
+	UPROPERTY(EditAnywhere)
+	float TransitionPhase = 1.0f;
+
+	FSignalVisuals()
+	{
+	}
+};
 
 UCLASS()
 class ROADTOOLS_API AJunctionSignalController : public AActor
@@ -78,6 +96,9 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FSignalPhase> Phases;
 
+	UPROPERTY(EditAnywhere)
+	TArray<FSignalVisuals> SignalVisuals;
+
 	//Editor Controls
 	bool UpdateSplines = false; //Grab all splines within the volume
 
@@ -88,7 +109,9 @@ public:
 	void UpdateAllConnectedJunctions();
 	UFUNCTION(CallInEditor)
 	void RebuildSignalController();
-	
+	UFUNCTION()
+	void PreloadStaticMeshComponents();
+
 	float GlobalTime;
 	float PhaseTimer = 0.0f; //How many seconds into the phase are we
 	int PhaseIndex = 0;		 //Which index of the phase are we in
@@ -110,6 +133,9 @@ public:
 
 	UFUNCTION()
 	void UpdateLanes(int Phase);
+
+	UFUNCTION()
+	void UpdateVisualMeshes(int Phase);
 
 	UFUNCTION()
 	void UpdatePhaseTimer();

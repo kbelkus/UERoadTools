@@ -210,16 +210,16 @@ void ABaseTrafficVehicle::Driving(float dt)
 	//Solve Speed
 	if (detectedObstacle == true || NextLaneStatus == 0 || CollidedLaneDrivingDirection == LaneDrivingDirection)
 	{
-		//Normalized Distance
+		//Normalized Distance 
 		DistanceToObstacle = FMath::Clamp(FVector::Distance(CollidedObjectLocation, RayStartPosition),0, CollisionDetectionDistance);
 
-		float MinDistanceTo = FMath::Min(CollisionDetectionDistance, DistanceToObstacle);
+		float MinDistanceTo = FMath::Min(DistanceToTarget, DistanceToObstacle);
 
 		float NormalizedDistance = (1.0 / CollisionDetectionDistance) * (MinDistanceTo);
-		UE_LOG(LogTemp, Log, TEXT("Distance to Obstacle: %f,  Normalized Distance %f"), DistanceToObstacle, NormalizedDistance);
+		//UE_LOG(LogTemp, Log, TEXT("Distance to Obstacle: %f,  Normalized Distance %f"), DistanceToObstacle, NormalizedDistance);
 
 		VehicleSpeed = FMath::Clamp(VehicleSpeed + ApplyBrakingForce(NormalizedDistance, VehicleSpeed) * dt,0, VehicleDynamicsStruct.VehicleMaxSpeed);
-		UE_LOG(LogTemp, Log, TEXT("Vehicle Speed: %f"), VehicleSpeed);
+		//UE_LOG(LogTemp, Log, TEXT("Vehicle Speed: %f"), VehicleSpeed);
 		//VehicleSpeed = FMath::Abs(FMath::Lerp(NormalizedDistance, 0.0f, VehicleMaxSpeed));
 
 		//Get Distance to Detected Obstacle or Target Object and compare who is smaller

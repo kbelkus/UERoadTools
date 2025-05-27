@@ -10,6 +10,7 @@
 class UProceduralMeshComponent;
 class ALaneSpline;
 class AJunctionSignalController;
+class UJunctionSurfaceComponent;
 
 UENUM(BlueprintType)
 enum class ELaneTurningOptions : uint8
@@ -483,6 +484,11 @@ public:
 
 	AJunctionSurface();
 
+	UFUNCTION()
+	void RebuildJunctionGeometry();
+	UFUNCTION()
+	float GetAccumilatedLaneWidth(FJunctionPoint InJunctionPoint, int LeftRightSelection, int SelectedLaneIndex);
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -558,7 +564,6 @@ protected:
 	UFUNCTION(CallInEditor)
 	void DisplayDebugInformation();
 
-
 	UFUNCTION()
 	TArray<FSplinePoint> CreateLanePoints(const int InResolution, const int LaneID, const FJunctionLaneData InLane, const TArray<FJunctionLaneData> InLaneArray, const int InLaneDirection, const float InJunctionLength, const FJunctionPoint InJunctionPoint); //Create Points to feed into the lanespline
 
@@ -567,8 +572,10 @@ protected:
 
 	UFUNCTION()
 	TArray<FSplinePoint> ConvertLocationsToSplinePoints(TArray<FVector> InLocations, FVector OffsetPoint);
-	//Generated Var
-	//TArray<FJunctionPoint> JunctionPoints;
+
+	//Visualizer
+	UFUNCTION()
+	void UpdateComponentVisulizer();
 
 	//Points to Desribe where on the RoadCurve does the junction Start
 	UPROPERTY(EditAnywhere, Meta = (MakeEditWidget = true))
@@ -593,6 +600,8 @@ private:
 	UProceduralMeshComponent* TurningLanesSurface;
 	UPROPERTY(EditAnywhere)
 	UProceduralMeshComponent* GenericLaneMarkingMaterial;
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<UJunctionSurfaceComponent> JunctionComponent;
 
 public:
 
@@ -633,13 +642,13 @@ public:
 	UPROPERTY(EditAnywhere)
 	TArray<FBezierCornerPoints> BezierEdgePoints;
 	FVector JunctionBoundingBox;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	TArray<FJunctionTurningLanePoint> TurningLanePoints; //Is this used? DEP
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	TArray<FTurningLaneConnections> TurningLaneConnections;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	TArray<FCapPoints> JunctionCenterLineEndPoint;
-	UPROPERTY(VisibleAnywhere)
+	UPROPERTY()
 	TArray<FJunctionTurningLane> TurningLanes; //Should we keep a reference to our ALaneSpline here?
 
 

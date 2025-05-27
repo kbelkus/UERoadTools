@@ -8,6 +8,8 @@
 #include "Tools/SignalManagerVisualizer.h"
 #include "SignalControllerComponent.h"
 #include "RoadToolsEditorModeCommands.h"
+#include "JunctionSurfaceComponent.h"
+#include "JunctionVisualiser.h"
 
 #define LOCTEXT_NAMESPACE "RoadToolsModule"
 
@@ -20,14 +22,19 @@ void FRoadToolsModule::StartupModule()
 
 	if (GUnrealEd)
 	{
-		
+		UE_LOG(LogTemp, Warning, TEXT("Road Tools Module has Loaded"));
 
-		UE_LOG(LogTemp, Warning, TEXT("KIERAN: THIS IS CALLED"));
-
+		//Signal Comp Vis
 		const TSharedPtr<FSignalManagerVisualizer> SignalComponentVisualizer = MakeShareable(new FSignalManagerVisualizer());
 
 		GUnrealEd->RegisterComponentVisualizer(USignalControllerComponent::StaticClass()->GetFName(), SignalComponentVisualizer);
 		SignalComponentVisualizer->OnRegister();
+
+		//Junction Comp Vis
+		const TSharedPtr<JunctionVisualiser> JunctionSurfaceCompVis = MakeShareable(new JunctionVisualiser());
+
+		GUnrealEd->RegisterComponentVisualizer(UJunctionSurfaceComponent::StaticClass()->GetFName(), JunctionSurfaceCompVis);
+		JunctionSurfaceCompVis->OnRegister();
 
 	}
 

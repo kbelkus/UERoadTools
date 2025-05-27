@@ -5,6 +5,7 @@
 #include "Runtime/Engine/Classes/Components/SceneComponent.h"
 #include "JunctionSurface.h"
 #include "LaneSpline.h"
+#include "Engine/StaticMeshActor.h"
 
 // Sets default values
 AJunctionSignalController::AJunctionSignalController()
@@ -58,13 +59,11 @@ void AJunctionSignalController::DrawPhaseDebug()
 
 	if (CurrentPhase.LaneGroupProceed.Num() > 0 && CurrentPhase.LaneGroupStop.Num() > 0)
 	{
-
-		//Draw Procced Arrows
+		//Draw Proceed Arrows
 		for (int i = 0; i < CurrentPhase.LaneGroupProceed.Num(); i++)
 		{
 			if (CurrentPhase.LaneGroupProceed[i])
 			{
-
 				USplineComponent* CurrentLaneComponent = CurrentPhase.LaneGroupProceed[i]->ReturnSpline();
 				FVector Location = CurrentLaneComponent->GetLocationAtSplinePoint(0, ESplineCoordinateSpace::World) + DebugSignalHeight;
 				FVector Direction = CurrentLaneComponent->GetDirectionAtSplinePoint(0, ESplineCoordinateSpace::World);
@@ -108,10 +107,25 @@ void AJunctionSignalController::DrawPhaseDebug()
 			}
 		}
 
-
 		//Draw Stop Arrows
 		DrawTrafficDebug();
 		//DrawLaneDebugPoints();
+
+		//Update Editor Meshes
+		for (int i = 0; i < SignalVisuals.Num(); i++)
+		{
+			if (SignalVisuals[i].ActivePhase == ClampedPhaseIndex)
+			{
+				SignalVisuals[i].RelatedStaticMeshes->GetStaticMeshComponent()->SetDefaultCustomPrimitiveDataFloat(4,3);
+			}
+			else
+			{
+				SignalVisuals[i].RelatedStaticMeshes->GetStaticMeshComponent()->SetDefaultCustomPrimitiveDataFloat(4, 1);
+			}
+
+
+		}
+
 
 	}
 }
@@ -140,9 +154,7 @@ void AJunctionSignalController::DrawTrafficDebug()
 
 	for (int i = 0; i < SignalDebugObjects.Num(); i++)
 	{
-
 		DrawDebugCone(GetWorld(), SignalDebugObjects[i].Position, SignalDebugObjects[i].Direction, Length, AngleWidth, AngleHeight, 32, SignalDebugObjects[i].Colour, true, -1.0f, 2, 3.0f);
-
 		DrawDebugSphere(GetWorld(), SignalDebugObjects[i].Position, 100.0f, 10, SignalDebugObjects[i].Colour, true, -1.0f, 2.0f, 3.0f);
 	}
 
@@ -262,13 +274,37 @@ void AJunctionSignalController::UpdateLanes(int Phase)
 	}
 }
 
+void AJunctionSignalController::PreloadStaticMeshComponents()
+{
+	for (int i = 0; i < SignalVisuals.Num(); i++)
+	{
+		SignalVisuals[i].StaticMeshComponent = SignalVisuals[i].RelatedStaticMeshes->GetStaticMeshComponent();
+	}
+}
+
+
+void AJunctionSignalController::UpdateVisualMeshes(int Phase)
+{
+	for (int i = 0; i < SignalVisuals.Num(); i++)
+	{
+		if (SignalVisuals[i].ActivePhase == Phase)
+		{
+			SignalVisuals[i].StaticMeshComponent->SetDefaultCustomPrimitiveDataFloat(4, 3);
+		}
+		else
+		{
+			SignalVisuals[i].StaticMeshComponent->SetDefaultCustomPrimitiveDataFloat(4, 1);
+		}
+	}
+}
+
+
+
 //With Update our Phase Index and Call our Update Lanes Function
 void AJunctionSignalController::UpdatePhaseTimer()
 {
-
 	UpdateSignals = true;
 	GetWorldTimerManager().ClearTimer(PhaseTimeHandle);
-
 }
 
 
@@ -277,6 +313,8 @@ void AJunctionSignalController::UpdatePhaseTimer()
 void AJunctionSignalController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	PreloadStaticMeshComponents();
 
 	if (isEnabled == true)
 	{
@@ -307,6 +345,7 @@ void AJunctionSignalController::Tick(float DeltaTime)
 		int NextPhase = (PhaseIndex + 1) % Phases.Num();
 		PhaseIndex = NextPhase;
 		UpdateLanes(PhaseIndex);
+		UpdateVisualMeshes(PhaseIndex);
 		DebugPhaseIndex = PhaseIndex;
 		FlushPersistentDebugLines(GetWorld());
 		DrawPhaseDebug();
