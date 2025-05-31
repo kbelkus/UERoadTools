@@ -1,8 +1,10 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#define LOCTEXT_NAMESPACE "FJunctionVisualiser"
 
 #include "ComponentVisualisers/JunctionVisualiser.h"
 #include "HitProxies.h"
+#include "EnumRange.h"
 
 struct HJunctionBaseVisProxy : public HComponentVisProxy
 {
@@ -69,7 +71,6 @@ struct HJunctionLaneWidth : public HJunctionBaseVisProxy
 	int32 LaneIndex;
 	int32 LeftRightSwitch;
 
-
 	virtual EMouseCursor::Type GetMouseCursor() override
 	{
 		return EMouseCursor::GrabHand;
@@ -92,7 +93,6 @@ struct HJunctionLaneTurningType : public HJunctionBaseVisProxy
 	EJunctionCommandAction CommandAction;
 	int32 LaneIndex;
 	int32 LeftRightSwitch;
-
 
 	virtual EMouseCursor::Type GetMouseCursor() override
 	{
@@ -117,7 +117,6 @@ struct HJunctionLaneDrivingType : public HJunctionBaseVisProxy
 	int32 LaneIndex;
 	int32 LeftRightSwitch;
 
-
 	virtual EMouseCursor::Type GetMouseCursor() override
 	{
 		return EMouseCursor::GrabHand;
@@ -132,6 +131,32 @@ IMPLEMENT_HIT_PROXY(HJunctionLaneWidth,       HJunctionBaseVisProxy);
 IMPLEMENT_HIT_PROXY(HJunctionLaneTurningType, HJunctionBaseVisProxy);
 IMPLEMENT_HIT_PROXY(HJunctionLaneDrivingType, HJunctionBaseVisProxy);
 
+//Register our Commands
+class FJunctionVisualiserCommands : public TCommands<FJunctionVisualiserCommands>
+{
+
+public:
+
+	FJunctionVisualiserCommands() : TCommands<FJunctionVisualiserCommands>
+		(
+			"RoadToolsJunctionVis", LOCTEXT("RoadToolsJunctionVis", "RoadToolsJunctionVis"), NAME_None, FAppStyle::GetAppStyleSetName()
+		) {}
+
+	virtual void RegisterCommands() override
+	{
+		UI_COMMAND(UpdateLaneDrivingType, "Select Lane Driving Type", "Select Lane Driving Type", EUserInterfaceActionType::Button, FInputGesture());
+		UI_COMMAND(UpdateLaneTurningRule, "Select Lane Turning Rule", "Select Lane Turning Rule", EUserInterfaceActionType::Button, FInputGesture());
+		UI_COMMAND(RebuildLanes, "RebuildLanes", "RebuildLanes", EUserInterfaceActionType::Button, FInputGesture());
+	}
+
+public:
+	/** Add Commands */
+	TSharedPtr<FUICommandInfo> UpdateLaneDrivingType;
+	TSharedPtr<FUICommandInfo> UpdateLaneTurningRule;
+	TSharedPtr<FUICommandInfo> RebuildLanes;
+
+};
+
 JunctionVisualiser::JunctionVisualiser()
 {
 }
@@ -143,6 +168,10 @@ JunctionVisualiser::~JunctionVisualiser()
 void JunctionVisualiser::OnRegister()
 {
 	UE_LOG(LogTemp, Log, TEXT("JunctionSurfaceVisuliser was registered"));
+
+	FJunctionVisualiserCommands::Register();
+
+	FJunctionVisualiserActions = MakeShareable(new FUICommandList);
 }
 
 void JunctionVisualiser::DrawVisualization(const UActorComponent* Component, const FSceneView* View, FPrimitiveDrawInterface* PDI)
@@ -238,7 +267,6 @@ bool JunctionVisualiser::VisProxyHandleClick(FEditorViewportClient* InViewportCl
 			}
 		}
 
-		
 		if (VisProxy && VisProxy->IsA(HJunctionLaneWidth::StaticGetType()))
 		{
 			HJunctionLaneWidth* Proxy = (HJunctionLaneWidth*)VisProxy;
@@ -270,8 +298,6 @@ bool JunctionVisualiser::VisProxyHandleClick(FEditorViewportClient* InViewportCl
 				return true;
 			}
 		}
-
-
 	}
 
 	return false;
@@ -283,14 +309,12 @@ bool JunctionVisualiser::GetWidgetLocation(const FEditorViewportClient* Viewport
 	{
 		OutLocation = OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].Location;
 		return true;
-
 	}
 
 	if (CurrentlySelectedIndex != INDEX_NONE && CurrentlySelectedCommandAction == EJunctionCommandAction::JUNCTIONENDPOINT)
 	{
 		OutLocation = OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].EndLocation;
 		return true;
-
 	}
 
 	if (CurrentlySelectedCommandAction == EJunctionCommandAction::LANEWIDTH)
@@ -299,7 +323,6 @@ bool JunctionVisualiser::GetWidgetLocation(const FEditorViewportClient* Viewport
 		//UE_LOG(LogTemp, Log, TEXT("Accum Width %f"), LaneWidth);
 		OutLocation = OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].EndLocation + (OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].RightVector * LaneWidth);
 		return true;
-
 	}
 
 	return false;
@@ -373,23 +396,69 @@ bool JunctionVisualiser::HandleInputDelta(FEditorViewportClient* ViewportClient,
 TSharedPtr<SWidget> JunctionVisualiser::GenerateContextMenu() const
 {
 	//FMenuBuilder MenuBuilder(true, )
+	FMenuBuilder MenuBuilder(true, FJunctionVisualiserActions);
+	{
+		MenuBuilder.BeginSection("Insert Actions");
+		{
+		}
 
+		TSharedPtr<FUICommandInfo> ChangeLaneDrivingStatus = nullptr;
 
-	return TSharedPtr<SWidget>();
+		if (FJunctionVisualiserCommands::Get().IsRegistered())
+		{
+			ChangeLaneDrivingStatus = FJunctionVisualiserCommands::Get().UpdateLaneDrivingType;
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Context menu error. Get help."));
+		}
+
+		//Check commands
+		if (ChangeLaneDrivingStatus != nullptr)
+		{
+			if (CurrentlySelectedCommandAction == EJunctionCommandAction::LANEWIDTH)
+			{
+				MenuBuilder.AddSeparator(FName("Driving Type"));
+				MenuBuilder.AddSeparator();
+				MenuBuilder.AddSubMenu(FText::FromString("Change Lane Driving Type"),
+					FText::FromString("Change Lane Driving Type"),
+					FNewMenuDelegate::CreateRaw(this, &JunctionVisualiser::BuildLaneDrivingTypeMenu));
+				MenuBuilder.AddSeparator(FName("What"));
+
+				MenuBuilder.AddSeparator(FName("Turnung Rule"));
+				MenuBuilder.AddSeparator();
+				MenuBuilder.AddSubMenu(FText::FromString("Change Lane Turning Rule"),
+					FText::FromString("Change Lane Turning Rule"),
+					FNewMenuDelegate::CreateRaw(this, &JunctionVisualiser::BuildLaneTurningMenu));
+				MenuBuilder.AddSeparator(FName("What"));
+
+				MenuBuilder.AddMenuEntry(
+					FText::FromString("Insert Point at this Location"),
+					FText::FromString("Insert Point at this Location"),
+					FSlateIcon(),
+					FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::RebuildJunctionLanes))
+				);
+			};
+		}
+	}
+
+	TSharedPtr<SWidget> MenuWidget = MenuBuilder.MakeWidget();
+	return MenuWidget;
+
 }
 
 
 
 void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex)
 {
-	float AccumilatedWidth = 0.0f;
+	float AccumilatedWidth = 175.0f;
 	int LaneIndex = 0;
 
 	for (FJunctionLaneData LeftLane : InLeftLanes)
 	{
-		AccumilatedWidth += LeftLane.LaneWidth;
+		AccumilatedWidth += (LeftLane.LaneWidth);
 
-		FVector LaneIconLocation = InEndLocation + (InJunctionPoint.RightVector * AccumilatedWidth);
+		FVector LaneIconLocation = InEndLocation + (InJunctionPoint.RightVector * AccumilatedWidth) + FVector(0.0f, 0.0f, 50.0f);
 
 		PDI->SetHitProxy(new HJunctionLaneWidth(Component, InLaneIndex, EJunctionCommandAction::LANEWIDTH, LaneIndex, 0));
 		PDI->DrawSprite(LaneIconLocation, 25.0f, 25.0f, JunctionEndIcon->GetResource(), FLinearColor::White, SDPG_Foreground, 0, 64, 0, 64, 1, 0.0f);
@@ -400,8 +469,6 @@ void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunc
 		PDI->SetHitProxy(NULL);
 
 		//Draw Lane Direction
-
-
 		//Draw Lane Type
 		DrawLaneOptionsUI(InJunctionPoint, LeftLane, LaneIconLocation, PDI, Component, InLaneIndex, LaneIndex, 0);
 
@@ -409,16 +476,19 @@ void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunc
 	}
 
 	LaneIndex = 0;
+	AccumilatedWidth = -175.0f;
 
 	for (FJunctionLaneData RightLane : InRightLanes)
 	{
 		AccumilatedWidth += RightLane.LaneWidth;
 
-		FVector LaneIconLocation = InEndLocation - (InJunctionPoint.RightVector * AccumilatedWidth);
+		FVector LaneIconLocation = (InEndLocation + (InJunctionPoint.RightVector * AccumilatedWidth)) + FVector(0.0f,0.0f,50.0f);
 
 		PDI->SetHitProxy(new HJunctionLaneWidth(Component, InLaneIndex, EJunctionCommandAction::LANEWIDTH, LaneIndex, 1));
 		PDI->DrawSprite(LaneIconLocation, 25.0f, 25.0f, JunctionEndIcon->GetResource(), FLinearColor::White, SDPG_Foreground, 0, 64, 0, 64, 1, 0.0f);
 		PDI->SetHitProxy(NULL);
+
+		DrawLaneOptionsUI(InJunctionPoint, RightLane, LaneIconLocation, PDI, Component, InLaneIndex, LaneIndex, 1);
 
 		LaneIndex += 1;
 	}
@@ -460,6 +530,11 @@ void JunctionVisualiser::DrawLaneOptionsUI(FJunctionPoint InJunctionPoint, FJunc
 		break;
 	}
 
+	if (InLeftRightSwitch == 1)
+	{
+		return;
+	}
+
 	//InLane.LaneType == ELaneDrivingType::NONE
 	switch (LaneTurningRule)
 	{
@@ -484,3 +559,76 @@ void JunctionVisualiser::DrawLaneOptionsUI(FJunctionPoint InJunctionPoint, FJunc
 	}
 	
 }
+
+void JunctionVisualiser::UpdateLaneDrivingType(ELaneDrivingType InDrivingType) const
+{
+
+	if (CurrentlySelectedLaneIndex != INDEX_NONE && CurrentlySelectedIndex != INDEX_NONE && OwnedJunctionSurface != nullptr)
+	{
+		UE_LOG(LogTemp, Log, TEXT("HEY OUR DRIVING MENU THING WORKED"));
+		if (LeftRightSwitch == 0)
+		{
+			OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].LeftLanes[CurrentlySelectedLaneIndex].RoadType = InDrivingType;
+		}
+		else
+		{
+			OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].RightLanes[CurrentlySelectedLaneIndex].RoadType = InDrivingType;
+		}
+
+		OwnedJunctionSurface->UpdateComponentVisulizer();
+	}
+}
+
+void JunctionVisualiser::UpdateLaneTurningRule(ELaneTurningOptions InTurningRule) const
+{
+
+	if (CurrentlySelectedLaneIndex != INDEX_NONE && CurrentlySelectedIndex != INDEX_NONE && OwnedJunctionSurface != nullptr)
+	{
+		UE_LOG(LogTemp, Log, TEXT("HEY OUR DRIVING MENU THING WORKED"));
+		OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].LeftLanes[CurrentlySelectedLaneIndex].TurningRule = InTurningRule;
+
+		OwnedJunctionSurface->UpdateComponentVisulizer();
+	}
+}
+
+void JunctionVisualiser::RebuildJunctionLanes() const
+{
+	if (OwnedJunctionSurface)
+	{
+		OwnedJunctionSurface->BuildAndUpdateLaneSplines();
+	}
+
+}
+
+void JunctionVisualiser::BuildLaneDrivingTypeMenu(FMenuBuilder& MenuBuilder) const
+{
+	for (ELaneDrivingType DrivingType : TEnumRange<ELaneDrivingType>())
+	{
+		FString EnumName = StaticEnum<ELaneDrivingType>()->GetNameStringByValue(static_cast<int64>(DrivingType));
+
+		MenuBuilder.AddMenuEntry(
+			FText::FromString(*EnumName),
+			FText::FromString("Menu Entry 2 Tooltip"),
+			FSlateIcon(),
+			FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::UpdateLaneDrivingType, DrivingType))
+		);
+	}
+}
+
+void JunctionVisualiser::BuildLaneTurningMenu(FMenuBuilder& MenuBuilder) const
+{
+	for (ELaneTurningOptions RuleType : TEnumRange<ELaneTurningOptions>())
+	{
+		FString EnumName = StaticEnum<ELaneTurningOptions>()->GetNameStringByValue(static_cast<int64>(RuleType));
+
+		MenuBuilder.AddMenuEntry(
+			FText::FromString(*EnumName),
+			FText::FromString("Menu Entry 2 Tooltip"),
+			FSlateIcon(),
+			FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::UpdateLaneTurningRule, RuleType))
+		);
+	}
+}
+
+
+#undef LOCTEXT_NAMESPACE

@@ -23,6 +23,8 @@ enum class ELaneTurningOptions : uint8
 	RIGHT = 5 UMETA(DisplayName = "Right Only"),
 };
 
+ENUM_RANGE_BY_FIRST_AND_LAST(ELaneTurningOptions, ELaneTurningOptions::ALL, ELaneTurningOptions::RIGHT);
+
 UENUM(BlueprintType)
 enum class ELaneDrivingType : uint8
 {
@@ -30,8 +32,10 @@ enum class ELaneDrivingType : uint8
 	DRIVING = 1  UMETA(DisplayName = "Driving"),
 	SHOULDER = 2     UMETA(DisplayName = "Shoulder"),
 	BICYCLE = 3 UMETA(DisplayName = "Bicycle"),
+	MAX      UMETA(Hidden),
 };
 
+ENUM_RANGE_BY_FIRST_AND_LAST(ELaneDrivingType, ELaneDrivingType::NONE, ELaneDrivingType::MAX);
 
 //Struct to hold our road decals
 USTRUCT()
@@ -371,7 +375,7 @@ struct FCapPoints
 	UPROPERTY(EditAnywhere)
 	ELaneTurningOptions TurningRule = ELaneTurningOptions::ALL;
 	UPROPERTY(EditAnywhere)
-	ELaneDrivingType RoadType = ELaneDrivingType::NONE;
+	ELaneDrivingType RoadType = ELaneDrivingType::DRIVING;
 	UPROPERTY(EditAnywhere)
 	TArray<int> SignalActivePhase;
 
@@ -489,6 +493,15 @@ public:
 	UFUNCTION()
 	float GetAccumilatedLaneWidth(FJunctionPoint InJunctionPoint, int LeftRightSelection, int SelectedLaneIndex);
 
+	//Visualizer
+	UFUNCTION()
+	void UpdateComponentVisulizer();
+
+	UFUNCTION(CallInEditor)
+	void BuildAndUpdateLaneSplines();
+	UFUNCTION()
+	void UpdateConnectedSignalController();
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -552,10 +565,7 @@ protected:
 
 	//Create Lane Spline Functions
 	//Editor Build Options
-	UFUNCTION(CallInEditor)
-	void BuildAndUpdateLaneSplines();
-	UFUNCTION()
-	void UpdateConnectedSignalController();
+
 	UFUNCTION()
 	TArray<ALaneSpline*> GetAllJunctionSplines();
 	//UFUNCTION(CallInEditor)
@@ -573,9 +583,6 @@ protected:
 	UFUNCTION()
 	TArray<FSplinePoint> ConvertLocationsToSplinePoints(TArray<FVector> InLocations, FVector OffsetPoint);
 
-	//Visualizer
-	UFUNCTION()
-	void UpdateComponentVisulizer();
 
 	//Points to Desribe where on the RoadCurve does the junction Start
 	UPROPERTY(EditAnywhere, Meta = (MakeEditWidget = true))
