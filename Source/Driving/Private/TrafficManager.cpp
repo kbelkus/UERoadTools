@@ -6,6 +6,7 @@
 #include "TrafficGridObject.h"
 #include "Math/UnrealMathUtility.h"
 #include "GenericPlatform/GenericPlatformMath.h"
+#include "TimerManager.h"
 
 // Sets default values
 ATrafficManager::ATrafficManager()
@@ -14,120 +15,159 @@ ATrafficManager::ATrafficManager()
 	PrimaryActorTick.bCanEverTick = true;
 }
 
+void ATrafficManager::StartRespawnTimer()
+{
+	GetWorldTimerManager().SetTimer(RespawnTimerHandle, this, &ATrafficManager::RespawnVehicleFromTimer, 10.0f, true, 1.0f);
+}
+
+void ATrafficManager::RespawnVehicleFromTimer()
+{
+	UE_LOG(LogTemp, Log, TEXT("Traffic Manager::Respawning Vehicle"));
+
+	if (VehiclesMarkedForRespawn.IsEmpty())
+	{
+		return;
+	}
+
+	TObjectPtr<ABaseTrafficVehicle> RespawnVehicle = VehiclesMarkedForRespawn[0];
+
+	//Get A Lane position
+	const FVector RespawnLocation = AvailableRoads[0].Lane->ReturnSpline()->GetWorldLocationAtTime(0.5);
+	const FVector RespawnDirection = AvailableRoads[0].Lane->ReturnSpline()->GetWorldDirectionAtTime(0.5);
+
+	FTransform RespawnTransform;
+	RespawnTransform.SetLocation(RespawnLocation + FVector(0,0,50.0f));
+	RespawnTransform.SetRotation(RespawnDirection.ToOrientationQuat());
+
+	RespawnVehicle->SetActorTransform(RespawnTransform);
+
+	RespawnVehicle->CurrentLane = AvailableRoads[0].Lane;
+	RespawnVehicle->CurrentLaneLength = AvailableRoads[0].Lane->ReturnSpline()->GetSplineLength();
+	RespawnVehicle->CurrentSpline = AvailableRoads[0].Lane->ReturnSpline();
+
+	RespawnVehicle->MarkedForRespawn = false;
+	RespawnVehicle->isValidVehicle = true;
+	RespawnVehicle->PendingRespawn = false;
+
+	VehiclesMarkedForRespawn.RemoveAt(0);
+
+	
+	
+}
+
 
 
 void ATrafficManager::OnConstruction(const FTransform& RootTransform)
 {
 
-	if (RebuildGrid == true)
-	{
-		CreateTrafficGrid();
-		RebuildGrid = false;
-	}
+	//if (RebuildGrid == true)
+	//{
+	//	CreateTrafficGrid();
+	//	RebuildGrid = false;
+	//}
 
 }
-
 
 //Get all the lanes near the player (Later cache this in a road manager and divide world into grid so we can sort / retrieve roads by querying one object
 void ATrafficManager::GetLanes()
 {
 
-	AvailableRoads.Empty();
-	TArray<AActor*> SceneActors;
-	
-	//Get all the roads in the scene (move this to grid system later)
+	//AvailableRoads.Empty();
+	//TArray<AActor*> SceneActors;
+	//
+	////Get all the roads in the scene (move this to grid system later)
 
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALaneSpline::StaticClass(), SceneActors);
+	//UGameplayStatics::GetAllActorsOfClass(GetWorld(), ALaneSpline::StaticClass(), SceneActors);
 
-	for (AActor* Actor : SceneActors)
-	{
+	//for (AActor* Actor : SceneActors)
+	//{
 
-		ALaneSpline* FoundLane = Cast<ALaneSpline>(Actor);
-		if (FoundLane)
-		{
-			if (FoundLane->isJunctionLane == false)
-			{
-				FLanes FoundLaneSpline;
+	//	ALaneSpline* FoundLane = Cast<ALaneSpline>(Actor);
+	//	if (FoundLane)
+	//	{
+	//		if (FoundLane->isJunctionLane == false)
+	//		{
+	//			FLanes FoundLaneSpline;
 
-				//Get Spline Center Point
-				USplineComponent* LaneSplineComponent;
-				LaneSplineComponent = FoundLane->GetComponentByClass<USplineComponent>();
-				FVector FirstPoint = LaneSplineComponent->GetLocationAtSplinePoint(0, ESplineCoordinateSpace::World);
-				FVector LastPoint = LaneSplineComponent->GetLocationAtSplinePoint(LaneSplineComponent->GetNumberOfSplinePoints() - 1, ESplineCoordinateSpace::World);
+	//			//Get Spline Center Point
+	//			USplineComponent* LaneSplineComponent;
+	//			LaneSplineComponent = FoundLane->GetComponentByClass<USplineComponent>();
+	//			FVector FirstPoint = LaneSplineComponent->GetLocationAtSplinePoint(0, ESplineCoordinateSpace::World);
+	//			FVector LastPoint = LaneSplineComponent->GetLocationAtSplinePoint(LaneSplineComponent->GetNumberOfSplinePoints() - 1, ESplineCoordinateSpace::World);
 
-				FoundLaneSpline.Lane = FoundLane;
-				
-				FoundLaneSpline.LanePosition = (FirstPoint + LastPoint) * 0.5f;
-				AvailableRoads.Add(FoundLaneSpline);
+	//			FoundLaneSpline.Lane = FoundLane;
+	//			
+	//			FoundLaneSpline.LanePosition = (FirstPoint + LastPoint) * 0.5f;
+	//			AvailableRoads.Add(FoundLaneSpline);
 
-			}
-		}
-	}
+	//		}
+	//	}
+	//}
 }
 
 //Spawn all traffic agents on begin play
 void ATrafficManager::InitialiseTrafficAgents()
 {
 
-	if (TrafficLibrary.Num() == 0 || TrafficAgentsPoolSize == 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Traffic Manager: Initialise Traffic Agents - Could not spawn traffic either library is empty or agent count is 0"));
-		return;
-	}
+	//if (TrafficLibrary.Num() == 0 || TrafficAgentsPoolSize == 0)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("Traffic Manager: Initialise Traffic Agents - Could not spawn traffic either library is empty or agent count is 0"));
+	//	return;
+	//}
 
-	int Cycle = 0;
+	//int Cycle = 0;
 
-	for (int i = 0; i < TrafficAgentsPoolSize; i++)
-	{
-		//Spawn our vehicles on random lanes
+	//for (int i = 0; i < TrafficAgentsPoolSize; i++)
+	//{
+	//	//Spawn our vehicles on random lanes
 
-		FTrafficAgents TrafficAgent;
-		//ABaseTrafficVehicle* TrafficVehicle;
-		//Get Random Road (CHECK IF SPAWNING AT SAME PLACE AS ANOTHER ACTOR)
-		int RoadIndex = i % (AvailableRoads.Num() - 1);
+	//	FTrafficAgents TrafficAgent;
+	//	//ABaseTrafficVehicle* TrafficVehicle;
+	//	//Get Random Road (CHECK IF SPAWNING AT SAME PLACE AS ANOTHER ACTOR)
+	//	int RoadIndex = i % (AvailableRoads.Num() - 1);
 
-		if (RoadIndex == AvailableRoads.Num() - 1)
-		{
-			Cycle = Cycle + 1;
-		}
+	//	if (RoadIndex == AvailableRoads.Num() - 1)
+	//	{
+	//		Cycle = Cycle + 1;
+	//	}
 
-		float PositionAlongSpline = Cycle * 0.10f; //Fixed Number for now, because we will never spawn that many vehicles
+	//	float PositionAlongSpline = Cycle * 0.10f; //Fixed Number for now, because we will never spawn that many vehicles
 
-		//Init Properties
-		USplineComponent* SpawnSpline;
-		SpawnSpline = AvailableRoads[RoadIndex].Lane->ReturnSpline();
+	//	//Init Properties
+	//	USplineComponent* SpawnSpline;
+	//	SpawnSpline = AvailableRoads[RoadIndex].Lane->ReturnSpline();
 
-		FVector SpawnLocation = SpawnSpline->GetLocationAtDistanceAlongSpline(PositionAlongSpline, ESplineCoordinateSpace::World);
-		FRotator SpawnRotation = SpawnSpline->GetRotationAtDistanceAlongSpline(PositionAlongSpline, ESplineCoordinateSpace::World);
+	//	FVector SpawnLocation = SpawnSpline->GetLocationAtDistanceAlongSpline(PositionAlongSpline, ESplineCoordinateSpace::World);
+	//	FRotator SpawnRotation = SpawnSpline->GetRotationAtDistanceAlongSpline(PositionAlongSpline, ESplineCoordinateSpace::World);
 
-		//Spawn Agent
-		FActorSpawnParameters SpawnParams;
-		SpawnParams.Owner = this;
+	//	//Spawn Agent
+	//	FActorSpawnParameters SpawnParams;
+	//	SpawnParams.Owner = this;
 
-		ABaseTrafficVehicle* NewTrafficAgent = GetWorld()->SpawnActor<ABaseTrafficVehicle>(ABaseTrafficVehicle::StaticClass(), SpawnLocation, SpawnRotation, SpawnParams);
+	//	ABaseTrafficVehicle* NewTrafficAgent = GetWorld()->SpawnActor<ABaseTrafficVehicle>(ABaseTrafficVehicle::StaticClass(), SpawnLocation, SpawnRotation, SpawnParams);
 
-		if (NewTrafficAgent)
-		{
-			NewTrafficAgent->CurrentLane = AvailableRoads[RoadIndex].Lane;
-			NewTrafficAgent->PositionAlongSplineLength = 0.0;
-			NewTrafficAgent->VehicleSpeed = 800.0f;
-			NewTrafficAgent->VehicleBodyMesh->SetStaticMesh(TrafficLibrary[0]->VehicleBodyMesh->GetStaticMesh());
-			
-			bool IsValidSpawn = false;
+	//	if (NewTrafficAgent)
+	//	{
+	//		NewTrafficAgent->CurrentLane = AvailableRoads[RoadIndex].Lane;
+	//		NewTrafficAgent->PositionAlongSplineLength = 0.0;
+	//		NewTrafficAgent->VehicleSpeed = 800.0f;
+	//		NewTrafficAgent->VehicleBodyMesh->SetStaticMesh(TrafficLibrary[0]->VehicleBodyMesh->GetStaticMesh());
+	//		
+	//		bool IsValidSpawn = false;
 
-			NewTrafficAgent->SetSpawnLocation(IsValidSpawn);
-		}
+	//		NewTrafficAgent->SetSpawnLocation(IsValidSpawn);
+	//	}
 
-		//TrafficAgent
-		TrafficAgent.DistanceFromPlayer = FVector::Distance(PlayerWorldLocation, SpawnLocation);
-		TrafficAgent.TrafficAgent = NewTrafficAgent;
-		TrafficAgent.delta = 0;
-		TrafficAgent.PositiveDeltaCount = 0;
+	//	//TrafficAgent
+	//	TrafficAgent.DistanceFromPlayer = FVector::Distance(PlayerWorldLocation, SpawnLocation);
+	//	TrafficAgent.TrafficAgent = NewTrafficAgent;
+	//	TrafficAgent.delta = 0;
+	//	TrafficAgent.PositiveDeltaCount = 0;
 
-		//Add Traffic Agent to Manager Pool
-		TrafficAgentsPool.Add(TrafficAgent);
+	//	//Add Traffic Agent to Manager Pool
+	//	TrafficAgentsPool.Add(TrafficAgent);
 
-	}
+	//}
 
 
 }
@@ -136,45 +176,45 @@ void ATrafficManager::InitialiseTrafficAgents()
 void ATrafficManager::UpdateTrafficAgents()
 {
 
-	//For all our agents loop through and check thier positions
-	const int VehicleCount = TrafficAgentsPool.Num();
+	////For all our agents loop through and check thier positions
+	//const int VehicleCount = TrafficAgentsPool.Num();
 
-	TrafficAgentRespawnList.Empty();
+	//TrafficAgentRespawnList.Empty();
 
-	//Get Vehicle Location
-	//Get Distance from Player
-	//if is outside of threshhold mark it
-	//if is already marked get previous distance and mark the delta
+	////Get Vehicle Location
+	////Get Distance from Player
+	////if is outside of threshhold mark it
+	////if is already marked get previous distance and mark the delta
 
-	for (int i = 0; i < VehicleCount - 1; i++)
-	{
+	//for (int i = 0; i < VehicleCount - 1; i++)
+	//{
 
-		FVector VehicleLocation;
+	//	FVector VehicleLocation;
 
-		//Get Distance
-		float DistanceToPLayer = FVector::Distance(TrafficAgentsPool[i].TrafficAgent->GetActorLocation(), PlayerWorldLocation);
-		float delta = DistanceToPLayer - TrafficAgentsPool[i].PreviousDistanceFromPlayer;
+	//	//Get Distance
+	//	float DistanceToPLayer = FVector::Distance(TrafficAgentsPool[i].TrafficAgent->GetActorLocation(), PlayerWorldLocation);
+	//	float delta = DistanceToPLayer - TrafficAgentsPool[i].PreviousDistanceFromPlayer;
 
-		//If our Vehicle is outside of our range
-		if (DistanceToPLayer > MaxVehicleDistance && delta > 0)
-		{
-			TrafficAgentsPool[i].PositiveDeltaCount = TrafficAgentsPool[i].PositiveDeltaCount + 1;
-			TrafficAgentsPool[i].PreviousDistanceFromPlayer = DistanceToPLayer;
-		}
-		else
-		{
-			TrafficAgentsPool[i].delta = 0;
-			TrafficAgentsPool[i].PositiveDeltaCount = 0;
-			TrafficAgentsPool[i].TrafficAgent->MarkedForRespawn = false;
-		}
+	//	//If our Vehicle is outside of our range
+	//	if (DistanceToPLayer > MaxVehicleDistance && delta > 0)
+	//	{
+	//		TrafficAgentsPool[i].PositiveDeltaCount = TrafficAgentsPool[i].PositiveDeltaCount + 1;
+	//		TrafficAgentsPool[i].PreviousDistanceFromPlayer = DistanceToPLayer;
+	//	}
+	//	else
+	//	{
+	//		TrafficAgentsPool[i].delta = 0;
+	//		TrafficAgentsPool[i].PositiveDeltaCount = 0;
+	//		TrafficAgentsPool[i].TrafficAgent->MarkedForRespawn = false;
+	//	}
 
-		if (TrafficAgentsPool[i].PositiveDeltaCount > 3)
-		{
-			UpdateSingleTrafficAgent(TrafficAgentsPool[i]);
-			TrafficAgentRespawnList.Add(i);
-		}
+	//	if (TrafficAgentsPool[i].PositiveDeltaCount > 3)
+	//	{
+	//		UpdateSingleTrafficAgent(TrafficAgentsPool[i]);
+	//		TrafficAgentRespawnList.Add(i);
+	//	}
 
-	}
+	//}
 
 }
 
@@ -192,49 +232,49 @@ void ATrafficManager::UpdateSingleTrafficAgent(FTrafficAgents TrafficAgent)
 void ATrafficManager::RespawnTrafficAgents()
 {
 
-	if (CurrentSpawnableLanes.Num() == 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("No Spawnable Lanes"))
-		return;
-	}
+	//if (CurrentSpawnableLanes.Num() == 0)
+	//{
+	//	UE_LOG(LogTemp, Warning, TEXT("No Spawnable Lanes"))
+	//	return;
+	//}
 
-	//For Each Agent in our list, find a new road location and update it
-	for (int i = 0; i < TrafficAgentRespawnList.Num(); i++)
-	{
-		//Loop through each aviable cell so we spawn cars in some linear order
-		//int CellIindex = i % ActiveSpawnCells.Num();
-		bool CanSpawn = false;
+	////For Each Agent in our list, find a new road location and update it
+	//for (int i = 0; i < TrafficAgentRespawnList.Num(); i++)
+	//{
+	//	//Loop through each aviable cell so we spawn cars in some linear order
+	//	//int CellIindex = i % ActiveSpawnCells.Num();
+	//	bool CanSpawn = false;
 
-		//Randomise Lane Selection
-		int RandomLaneID = GetRandomInt(0, CurrentSpawnableLanes.Num() - 1);
-		UE_LOG(LogTemp, Warning, TEXT("RandomLaneID, %i"), RandomLaneID);
+	//	//Randomise Lane Selection
+	//	int RandomLaneID = GetRandomInt(0, CurrentSpawnableLanes.Num() - 1);
+	//	UE_LOG(LogTemp, Warning, TEXT("RandomLaneID, %i"), RandomLaneID);
 
-		ABaseTrafficVehicle* CurrentAgent = TrafficAgentsPool[TrafficAgentRespawnList[i]].TrafficAgent;
+	//	ABaseTrafficVehicle* CurrentAgent = TrafficAgentsPool[TrafficAgentRespawnList[i]].TrafficAgent;
 
-		USplineComponent* SpawnSpline;
-		//int LaneIndex = i % (CurrentSpawnableLanes.Num() - 1);
-		SpawnSpline = CurrentSpawnableLanes[RandomLaneID]->ReturnSpline(); //CLAMP THIS
+	//	USplineComponent* SpawnSpline;
+	//	//int LaneIndex = i % (CurrentSpawnableLanes.Num() - 1);
+	//	SpawnSpline = CurrentSpawnableLanes[RandomLaneID]->ReturnSpline(); //CLAMP THIS
 
-		//This is fixed, but we want to eventually async check along road
-		float SplineTime = 0.1f;
+	//	//This is fixed, but we want to eventually async check along road
+	//	float SplineTime = 0.1f;
 
-		FVector SpawnLocation = SpawnSpline->GetWorldLocationAtTime(SplineTime, false);
-		float DistanceAlongSpline = SpawnSpline->GetSplineLength() * SplineTime;
+	//	FVector SpawnLocation = SpawnSpline->GetWorldLocationAtTime(SplineTime, false);
+	//	float DistanceAlongSpline = SpawnSpline->GetSplineLength() * SplineTime;
 
-		//Eventually move this to a re-init function
-		if (SpawnSpline)
-		{
-			CurrentAgent->SetActorLocation(SpawnLocation, false, nullptr, ETeleportType::TeleportPhysics);
-			CurrentAgent->CurrentLane = CurrentSpawnableLanes[RandomLaneID];
-			CurrentAgent->CurrentSpline = SpawnSpline;
-			CurrentAgent->PositionAlongSplineLength = DistanceAlongSpline;
-			CurrentAgent->CurrentLaneLength = SpawnSpline->GetSplineLength();
-			CurrentAgent->MarkedForRespawn = false;
-			CurrentAgent->FoundNextLane = false;
-			TrafficAgentsPool[TrafficAgentRespawnList[i]].delta = 0.0;
-			TrafficAgentsPool[TrafficAgentRespawnList[i]].PositiveDeltaCount = 0;
-		}
-	}
+	//	//Eventually move this to a re-init function
+	//	if (SpawnSpline)
+	//	{
+	//		CurrentAgent->SetActorLocation(SpawnLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	//		CurrentAgent->CurrentLane = CurrentSpawnableLanes[RandomLaneID];
+	//		CurrentAgent->CurrentSpline = SpawnSpline;
+	//		CurrentAgent->PositionAlongSplineLength = DistanceAlongSpline;
+	//		CurrentAgent->CurrentLaneLength = SpawnSpline->GetSplineLength();
+	//		CurrentAgent->MarkedForRespawn = false;
+	//		CurrentAgent->FoundNextLane = false;
+	//		TrafficAgentsPool[TrafficAgentRespawnList[i]].delta = 0.0;
+	//		TrafficAgentsPool[TrafficAgentRespawnList[i]].PositiveDeltaCount = 0;
+	//	}
+	//}
 
 }
 
@@ -299,18 +339,18 @@ void ATrafficManager::UpdatePlayerCell()
 void ATrafficManager::DestroyNeighbourCells()
 {
 
-	if (TrafficCells.Num() > 0)
-	{
-		//Remove all Traffic Cells that exist in the scene
-		for (int i = 0; i < TrafficCells.Num(); i++)
-		{
-			if (TrafficCells[i] != nullptr)
-			{
-				TrafficCells[i]->Destroy();
-			}
-		}
+	//if (TrafficCells.Num() > 0)
+	//{
+	//	//Remove all Traffic Cells that exist in the scene
+	//	for (int i = 0; i < TrafficCells.Num(); i++)
+	//	{
+	//		if (TrafficCells[i] != nullptr)
+	//		{
+	//			TrafficCells[i]->Destroy();
+	//		}
+	//	}
 
-	}
+	//}
 
 
 }
@@ -319,70 +359,70 @@ void ATrafficManager::DestroyNeighbourCells()
 void ATrafficManager::CreateTrafficGrid()
 {
 	
-	if (TrafficCells.Num() > 0)
-	{
-		//Remove all Traffic Cells that exist in the scene
-		for (int i = 0; i < TrafficCells.Num(); i++)
-		{
-			if (TrafficCells[i] != nullptr)
-			{
-				TrafficCells[i]->Destroy();
-			}
-		}
+	//if (TrafficCells.Num() > 0)
+	//{
+	//	//Remove all Traffic Cells that exist in the scene
+	//	for (int i = 0; i < TrafficCells.Num(); i++)
+	//	{
+	//		if (TrafficCells[i] != nullptr)
+	//		{
+	//			TrafficCells[i]->Destroy();
+	//		}
+	//	}
 
-	}
-	
-	TrafficCells.Empty();
-	CellPositions.Empty();
+	//}
+	//
+	//TrafficCells.Empty();
+	//CellPositions.Empty();
 
-	//RoadPoints.Empty();
-	GetAllLaneSplinePoints();
+	////RoadPoints.Empty();
+	//GetAllLaneSplinePoints();
 
-	FVector CellSize = GridWorldBounds / GridResolution;
-	FVector OffsetLocation = GridWorldBounds * FVector(0.5f, 0.5f, 0.5f);
-	CellsOffsetSpace = OffsetLocation;
-	IndividualCellSize = CellSize;
+	//FVector CellSize = GridWorldBounds / GridResolution;
+	//FVector OffsetLocation = GridWorldBounds * FVector(0.5f, 0.5f, 0.5f);
+	//CellsOffsetSpace = OffsetLocation;
+	//IndividualCellSize = CellSize;
 
-	int CellIndex = 0;
+	//int CellIndex = 0;
 
-	for (int i = 0; i < GridResolution.X; i++)
-	{
-		
-		float XLocation = CellSize.X * i;
-		float YLocation = 0.0f;
+	//for (int i = 0; i < GridResolution.X; i++)
+	//{
+	//	
+	//	float XLocation = CellSize.X * i;
+	//	float YLocation = 0.0f;
 
-		for (int j = 0; j < GridResolution.Y; j++)
-		{
-			YLocation = CellSize.Y * j;
+	//	for (int j = 0; j < GridResolution.Y; j++)
+	//	{
+	//		YLocation = CellSize.Y * j;
 
-			FVector CellLocation = FVector(XLocation, YLocation,  0.0f) - FVector(OffsetLocation.X, OffsetLocation.Y,0.0f);
+	//		FVector CellLocation = FVector(XLocation, YLocation,  0.0f) - FVector(OffsetLocation.X, OffsetLocation.Y,0.0f);
 
-			FActorSpawnParameters SpawnParams;
-			SpawnParams.Owner = this;
+	//		FActorSpawnParameters SpawnParams;
+	//		SpawnParams.Owner = this;
 
-			ATrafficGridObject* NewTrafficGridObject = GetWorld()->SpawnActor<ATrafficGridObject>(ATrafficGridObject::StaticClass(), CellLocation, FRotator(0.0f), SpawnParams);
+	//		ATrafficGridObject* NewTrafficGridObject = GetWorld()->SpawnActor<ATrafficGridObject>(ATrafficGridObject::StaticClass(), CellLocation, FRotator(0.0f), SpawnParams);
 
-			if (NewTrafficGridObject)
-			{
-				NewTrafficGridObject->CellSize = CellSize * 0.5f;
-				NewTrafficGridObject->SetBoxExtent(CellSize * 0.5f);
-				FString CellNameID = FString::Printf(TEXT("TrafficCellGrid_%d"), CellIndex);
-				//NewTrafficGridObject->Rename(*CellNameID);
-				NewTrafficGridObject->SetActorLabel(CellNameID);
-				NewTrafficGridObject->CellID = CellIndex;
-				//NewTrafficGridObject->CollisionBounds->SetBoxExtent(CellSize);
+	//		if (NewTrafficGridObject)
+	//		{
+	//			NewTrafficGridObject->CellSize = CellSize * 0.5f;
+	//			NewTrafficGridObject->SetBoxExtent(CellSize * 0.5f);
+	//			FString CellNameID = FString::Printf(TEXT("TrafficCellGrid_%d"), CellIndex);
+	//			//NewTrafficGridObject->Rename(*CellNameID);
+	//			NewTrafficGridObject->SetActorLabel(CellNameID);
+	//			NewTrafficGridObject->CellID = CellIndex;
+	//			//NewTrafficGridObject->CollisionBounds->SetBoxExtent(CellSize);
 
-				TrafficCells.Add(NewTrafficGridObject);
-				CellPositions.Add(CellLocation);
+	//			TrafficCells.Add(NewTrafficGridObject);
+	//			CellPositions.Add(CellLocation);
 
-				CellIndex = CellIndex + 1;
+	//			CellIndex = CellIndex + 1;
 
-			}
-		}
-	}
+	//		}
+	//	}
+	//}
 
-	AssignLanesToCells();
-	AssignNeighbourCells();
+	//AssignLanesToCells();
+	//AssignNeighbourCells();
 
 }
 
@@ -536,11 +576,8 @@ void ATrafficManager::AssignLanesToCells()
 
 				TrafficCells[i]->ConnectedRoads.Add(ConnectedRoads);
 			}
-
 		}
-
 	}
-
 }
 
 
@@ -549,14 +586,15 @@ void ATrafficManager::BeginPlay()
 {
 	Super::BeginPlay();
 
+	StartRespawnTimer();
 
-	//Spawn all our initial traffic agents
+	////Spawn all our initial traffic agents
 
-	//Get Roads
-	GetLanes();
-	InitialiseTrafficAgents();
+	////Get Roads
+	//GetLanes();
+	//InitialiseTrafficAgents();
 
-	//Spawn Traffic Agents
+	////Spawn Traffic Agents
 
 
 }
@@ -565,18 +603,19 @@ void ATrafficManager::BeginPlay()
 void ATrafficManager::Tick(float DeltaTime)
 {
 
-	PlayerWorldLocation = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorLocation();
+	//PlayerWorldLocation = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorLocation();
 
 
-	Super::Tick(DeltaTime);
 
-	//Update our Player Vehicle Location and Return Current Cell
-	UpdatePlayerCell();
+	//Super::Tick(DeltaTime);
 
-	//Update Our Vehicle Data every n frames (every 5 seconds?)
-	UpdateTrafficAgents();
+	////Update our Player Vehicle Location and Return Current Cell
+	//UpdatePlayerCell();
 
-	RespawnTrafficAgents();
+	////Update Our Vehicle Data every n frames (every 5 seconds?)
+	//UpdateTrafficAgents();
+
+	//RespawnTrafficAgents();
 
 
 }

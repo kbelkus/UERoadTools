@@ -171,8 +171,6 @@ void AJunctionSignalController::DrawTrafficDebug()
 
 }
 
-
-
 void AJunctionSignalController::DrawDebugBounds()
 {
 	//DrawDebugBox(GetWorld(), Center, Extent, FColor::Blue, true, 1000.0f, 1, 10.0f);
@@ -180,7 +178,6 @@ void AJunctionSignalController::DrawDebugBounds()
 	//DrawDebugPoint(GetWorld(), Center, 20.0f, FColor::Red, true, -1.0f, 10);
 
 }
-
 
 
 //When called loop through all connected splines and set their lane status

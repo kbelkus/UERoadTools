@@ -11,9 +11,9 @@
 
 class UTrafficWheelComponent;
 class UVehicleDynamicsDataAsset;
+class ATrafficManager;
 
 DECLARE_STATS_GROUP(TEXT("Vehicle Dynamics"), STATGROUP_VehicleAI, STATCAT_VehicleAI);
-
 
 //CAN DEP THIS
 USTRUCT()
@@ -108,6 +108,8 @@ public:
 	void UpdateWheelRotation(int InWheelID, float InDeltaTime, FVector InVehicleLocation, float InSpeedDelta);
 	UFUNCTION()
 	float ApplyBrakingForce(float InNormalizedDistance, float InCurrentSpeed);
+	UFUNCTION()
+	bool ValidateVehicle();
 
 
 protected:
@@ -237,6 +239,10 @@ public:
 	//Vehicle Traffic Manager Properties - Updating Spawning etc
 	UPROPERTY(VisibleAnywhere)
 	bool MarkedForRespawn = false;
+	UPROPERTY(VisibleAnywhere)
+	bool PendingRespawn = false;
+	UPROPERTY()
+	TObjectPtr<ATrafficManager> TrafficManager;
 
 	//Vehicle Dynamics Data for this actor
 	UPROPERTY(EditAnywhere)

@@ -448,7 +448,6 @@ TSharedPtr<SWidget> JunctionVisualiser::GenerateContextMenu() const
 }
 
 
-
 void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex)
 {
 	float AccumilatedWidth = 175.0f;
@@ -492,7 +491,6 @@ void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunc
 
 		LaneIndex += 1;
 	}
-
 }
 
 void JunctionVisualiser::DrawLaneOptionsUI(FJunctionPoint InJunctionPoint, FJunctionLaneData InLane, FVector InLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InJunctionIndex, int InLaneIndex, int InLeftRightSwitch)

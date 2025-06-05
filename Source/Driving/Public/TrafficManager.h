@@ -79,6 +79,15 @@ public:
 	// Sets default values for this actor's properties
 	ATrafficManager();
 
+	FTimerHandle RespawnTimerHandle;
+
+	//Respawn Vehicles
+	UFUNCTION()
+	void StartRespawnTimer();
+
+	UFUNCTION()
+	void RespawnVehicleFromTimer();
+
 	UFUNCTION()
 	void GetLanes();
 	UFUNCTION()
@@ -105,10 +114,9 @@ public:
 	void DestroyNeighbourCells();
 
 protected:
-	// Called when the game starts or when spawned
+
 	virtual void BeginPlay() override;
 
-	//Override Construction SCript
 	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UFUNCTION()
@@ -120,6 +128,11 @@ protected:
 
 
 public:	
+
+
+	//V2 - Vehicles that need to be respawned
+	UPROPERTY(VisibleAnywhere)
+	TArray<TObjectPtr<ABaseTrafficVehicle>> VehiclesMarkedForRespawn;
 
 	UPROPERTY(EditAnywhere)
 	TArray<ABaseTrafficVehicle*> TrafficLibrary;

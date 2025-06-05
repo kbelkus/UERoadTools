@@ -7,6 +7,7 @@
 #include "AIVehicleDynamicsUtilities.h"
 #include "Kismet/GameplayStatics.h"
 #include "RoadLayoutManager.h"
+#include "TrafficManager.h"
 
 DECLARE_CYCLE_STAT(TEXT("Vehicle AI Update"), STAT_VehicleUpdate, STATGROUP_VehicleAI);
 DECLARE_CYCLE_STAT(TEXT("Vehicle AI Dynamics"), STAT_VehicleDynamics, STATGROUP_VehicleAI);
@@ -279,7 +280,8 @@ void ABaseTrafficVehicle::Driving(float dt)
 
 	ResolveVehiclePhysics(dt, VehicleWorldLocation, VehicleWorldRotation);
 
-
+	//Validate Vehicle and Mark for Respawn if needed
+	MarkedForRespawn = ValidateVehicle();
 }
 
 void ABaseTrafficVehicle::GetNextLane()
@@ -582,6 +584,16 @@ float ABaseTrafficVehicle::ApplyBrakingForce(float InNormalizedDistance, float I
 	return -BreakingForce;
 }
 
+bool ABaseTrafficVehicle::ValidateVehicle()
+{
+	if (this->GetActorLocation().Z < -100.0f)
+	{
+		return true;
+	}
+
+	return false;
+}
+
 // Called when the game starts or when spawned
 void ABaseTrafficVehicle::BeginPlay()
 {
@@ -611,6 +623,14 @@ void ABaseTrafficVehicle::BeginPlay()
 
 	VehicleBodyMesh->SetCollisionProfileName(FName("VehicleAI"));
 
+	//Get Traffic Manager //Later we could just do this once via a level BP or something
+	TArray<AActor*> FoundActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ATrafficManager::StaticClass(), FoundActors);
+
+	if(!FoundActors.IsEmpty())
+	{ 
+		TrafficManager = Cast<ATrafficManager>(FoundActors[0]);
+	}
 
 }
 
@@ -623,8 +643,20 @@ void ABaseTrafficVehicle::Tick(float DeltaTime)
 
 	SCOPE_CYCLE_COUNTER(STAT_VehicleUpdate);
 
-	if(isValidVehicle == false)
+	if (PendingRespawn == true)
 	{
+		this->SetActorLocation(FVector(0.0f, 0.0f, -900.0f));
+	}
+
+	if (isValidVehicle == false || MarkedForRespawn == true)
+	{
+		//If the vehicle is somehow invalid put it in the naughty corner
+		this->SetActorLocation(FVector(0.0f, 0.0f, -900.0f)); 
+
+		//Tell the Traffic Manager this vehicle needs to be respawned somewhere!
+		TrafficManager->VehiclesMarkedForRespawn.AddUnique(this);
+		PendingRespawn = true;
+
 		return;
 	}
 
