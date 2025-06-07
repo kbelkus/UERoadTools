@@ -480,7 +480,7 @@ void ARoadSurface::GenerateTriangles()
 			TriangleIndices.Add(fifth);
 			TriangleIndices.Add(sixth);
 		}
-		rootIndex = i * widthPoints;
+		rootIndex = i * widthPoints; //THIS IS WRONG??
 	}
 	return;
 }

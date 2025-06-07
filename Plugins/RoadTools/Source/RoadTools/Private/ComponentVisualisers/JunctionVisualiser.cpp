@@ -213,8 +213,10 @@ void JunctionVisualiser::DrawVisualization(const UActorComponent* Component, con
 	LaneTurningForwardRight = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, TEXT("/RoadTools/Icons/LaneForwardRight.LaneForwardRight")));
 	LaneTurningRight = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, TEXT("/RoadTools/Icons/LaneRight.LaneRight")));
 
+	DigitIcons = Cast<UTexture2D>(StaticLoadObject(UTexture2D::StaticClass(), nullptr, TEXT("/RoadTools/Icons/Digits.Digits")));
 	//Draw Junction Center UI
 
+	const FVector ViewDirection = View->GetViewDirection();
 
 	//Draw Junction Location UI
 	for (int i = 0; i < JunctionPoints.Num(); i++)
@@ -233,11 +235,13 @@ void JunctionVisualiser::DrawVisualization(const UActorComponent* Component, con
 		PDI->DrawSprite(EndLocation, 50.0f, 50.0f, JunctionEndIcon->GetResource(), FLinearColor::White, SDPG_Foreground, 0, 64, 0, 64, 1, 0.0f);
 		PDI->SetHitProxy(NULL);
 
+
+
+
 		//Draw Lane UI
-		DrawLaneUI(JunctionPoints[i], JunctionPoints[i].LeftLanes, JunctionPoints[i].RightLanes, LaneEndLocation, PDI, Component, i);
+		DrawLaneUI(JunctionPoints[i], JunctionPoints[i].LeftLanes, JunctionPoints[i].RightLanes, LaneEndLocation, PDI, Component, i, ViewDirection);
 
 	}
-
 }
 
 bool JunctionVisualiser::VisProxyHandleClick(FEditorViewportClient* InViewportClient, HComponentVisProxy* VisProxy, const FViewportClick& Click)
@@ -432,9 +436,18 @@ TSharedPtr<SWidget> JunctionVisualiser::GenerateContextMenu() const
 					FNewMenuDelegate::CreateRaw(this, &JunctionVisualiser::BuildLaneTurningMenu));
 				MenuBuilder.AddSeparator(FName("What"));
 
+				MenuBuilder.AddSeparator(FName("Signal Phase"));
+				MenuBuilder.AddSeparator();
+				MenuBuilder.AddSubMenu(FText::FromString("Change Lane Phase Index"),
+					FText::FromString("Change Lane Phase Index"),
+					FNewMenuDelegate::CreateRaw(this, &JunctionVisualiser::BuildLaneSignalMenu));
+				MenuBuilder.AddSeparator(FName("What"));
+
+				MenuBuilder.AddSeparator(FName("What"));
+
 				MenuBuilder.AddMenuEntry(
-					FText::FromString("Insert Point at this Location"),
-					FText::FromString("Insert Point at this Location"),
+					FText::FromString("Rebuild Lanes"),
+					FText::FromString("Rebuild Lanes"),
 					FSlateIcon(),
 					FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::RebuildJunctionLanes))
 				);
@@ -448,7 +461,7 @@ TSharedPtr<SWidget> JunctionVisualiser::GenerateContextMenu() const
 }
 
 
-void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex)
+void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex, FVector InViewDirection)
 {
 	float AccumilatedWidth = 175.0f;
 	int LaneIndex = 0;
@@ -470,6 +483,19 @@ void JunctionVisualiser::DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunc
 		//Draw Lane Direction
 		//Draw Lane Type
 		DrawLaneOptionsUI(InJunctionPoint, LeftLane, LaneIconLocation, PDI, Component, InLaneIndex, LaneIndex, 0);
+
+		const FVector Offset = InJunctionPoint.RightVector;
+
+		//Draw our signal Phase Debug Numbers
+		for (int i = 0; i < LeftLane.SignalActivePhase.Num(); i++)
+		{
+			float IconStartCorner = LeftLane.SignalActivePhase[i] * DigitIconWidth;
+			FVector IconLocation = LaneIconLocation + (Offset * 50.0f);
+			FVector Zero = FVector::ZeroVector;
+
+			PDI->DrawSprite(IconLocation, 10.0f, 10.0f, DigitIcons->GetResource(), FLinearColor::White, SDPG_Foreground, IconStartCorner, 15.0f, 0.0f, 15.0f, 1, 0.0f);
+		}
+
 
 		LaneIndex += 1;
 	}
@@ -589,6 +615,19 @@ void JunctionVisualiser::UpdateLaneTurningRule(ELaneTurningOptions InTurningRule
 	}
 }
 
+void JunctionVisualiser::UpdateSignalActivePhase(int InPhase) const
+{
+
+	if (CurrentlySelectedLaneIndex != INDEX_NONE && CurrentlySelectedIndex != INDEX_NONE && OwnedJunctionSurface != nullptr)
+	{
+		UE_LOG(LogTemp, Log, TEXT("HEY OUR DRIVING MENU THING WORKED"));
+		OwnedJunctionSurface->JunctionPoints[CurrentlySelectedIndex].LeftLanes[CurrentlySelectedLaneIndex].SignalActivePhase[0] = InPhase;
+
+		OwnedJunctionSurface->UpdateComponentVisulizer();
+	}
+}
+
+
 void JunctionVisualiser::RebuildJunctionLanes() const
 {
 	if (OwnedJunctionSurface)
@@ -625,6 +664,22 @@ void JunctionVisualiser::BuildLaneTurningMenu(FMenuBuilder& MenuBuilder) const
 			FSlateIcon(),
 			FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::UpdateLaneTurningRule, RuleType))
 		);
+	}
+}
+
+void JunctionVisualiser::BuildLaneSignalMenu(FMenuBuilder& MenuBuilder) const
+{
+	for (int i = 0; i < 10; i++)
+	{
+		FString MenuEntry = FString::FromInt(i);
+
+		MenuBuilder.AddMenuEntry(
+			FText::FromString(MenuEntry),
+			FText::FromString("Set Lane Phase"),
+			FSlateIcon(),
+			FUIAction(FExecuteAction::CreateSP(this, &JunctionVisualiser::UpdateSignalActivePhase, i))
+		);
+
 	}
 }
 

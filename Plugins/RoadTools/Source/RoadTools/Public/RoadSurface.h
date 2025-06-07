@@ -46,8 +46,6 @@ struct FLaneMarking
 	}
 };
 
-
-
 USTRUCT()
 struct FLaneData
 {
@@ -78,7 +76,6 @@ struct FLaneData
 	}
 };
 
-
 USTRUCT()
 struct FLaneSection
 {
@@ -97,7 +94,6 @@ struct FLaneSection
 	}
 };
 
-
 USTRUCT()
 struct FRoadProfile
 {
@@ -109,8 +105,6 @@ struct FRoadProfile
 
 	}
 };
-
-
 
 
 UCLASS()

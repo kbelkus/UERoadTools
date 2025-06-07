@@ -72,14 +72,18 @@ public:
 	TSoftObjectPtr<UTexture2D> LaneTurningForwardRight;
 	TSoftObjectPtr<UTexture2D> LaneTurningRight;
 
+	//Utility Icons
+	TSoftObjectPtr<UTexture2D> DigitIcons;
+	const float DigitIconWidth = 15.0f;
 
 	//FUNCTIONS
-	virtual void DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex);
+	virtual void DrawLaneUI(FJunctionPoint InJunctionPoint, TArray<FJunctionLaneData> InLeftLanes, TArray<FJunctionLaneData> InRightLanes, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InLaneIndex, FVector InViewDirection);
 	virtual void DrawLaneOptionsUI(FJunctionPoint InJunctionPoint, FJunctionLaneData InLane, FVector InEndLocation, FPrimitiveDrawInterface* PDI, const UActorComponent* Component, int InJunctionIndex, int InLaneIndex, int InLeftRightSwitch);
 
 	//EDITOR FUNCTIONS
 	void UpdateLaneDrivingType(ELaneDrivingType InDrivingType) const;
 	void UpdateLaneTurningRule(ELaneTurningOptions InTurningRule) const;
+	void UpdateSignalActivePhase(int InPhase) const;
 	void RebuildJunctionLanes() const;
 
 	//UI Selection //Could move this to its own class with validation?
@@ -94,6 +98,7 @@ public:
 	//SubMenu Builders
 	void BuildLaneDrivingTypeMenu(FMenuBuilder& MenuBuilder) const;
 	void BuildLaneTurningMenu(FMenuBuilder& MenuBuilder) const;
+	void BuildLaneSignalMenu(FMenuBuilder& MenuBuilder) const;
 
 };
 
