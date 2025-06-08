@@ -58,6 +58,11 @@ bool ASidewalkSurface::UpdatePrimaryEdgeSpline()
 		bHandled = GetRoadSurfaceEdge();
 	}
 
+	if (SideWalkGenerationType == ESideWalkGenerationType::JUNCTION)
+	{
+		bHandled = GetJunctionSurfaceEdge();
+	}
+
 	return bHandled;
 }
 
@@ -119,9 +124,70 @@ bool ASidewalkSurface::GetRoadSurfaceEdge()
 	return bHandled;
 }
 
-void ASidewalkSurface::GetJunctionEdge()
+bool ASidewalkSurface::GetJunctionSurfaceEdge()
 {
+	bool bHandled = false;
 
+	if (!ConnectedJunctionSurface || !PrimaryEdgeSpline)
+	{
+		UE_LOG(LogTemp, Error, TEXT("SideWalkSurface::GetJunctionEdge Connected Junction or Primary Edge Spline returned null"));
+		return bHandled;
+	}
+
+	//and makesure that our index is valid
+	if (!ConnectedJunctionSurface->BezierEdgePoints.IsValidIndex(JunctionSideID))
+	{
+		UE_LOG(LogTemp, Log, TEXT("Bezier Corner Points index is invalid will exit"));
+		return bHandled;
+	}
+
+	//We now need to makesure our spline is built from our edge... luckily I had some foresight and kept the beizier curve struct around so we can use that... with some extras..
+	PrimaryEdgeSpline->ClearSplinePoints();
+
+	FBezierCornerPoints BezierEdgePoints = ConnectedJunctionSurface->BezierEdgePoints[JunctionSideID];
+	
+	TArray<FVector> CornerPointLocations = ConnectedJunctionSurface->BezierEdgePoints[JunctionSideID].Position;
+	
+	if (CornerPointLocations.IsEmpty())
+	{
+		UE_LOG(LogTemp, Log, TEXT("Corner Point Location sis empty."));
+		return bHandled;
+	}
+
+	//We actually need to do some extra logic here to get the actual lanes width - since our junction has non uniform lanes. Note/To Do: Since we always do everything in a anti-clockwise order -> we always know if something is left or right
+	
+	FJunctionPoint JunctionStartPoint = ConnectedJunctionSurface->JunctionPoints[BezierEdgePoints.StartJunctionID];
+	FJunctionPoint EndJunctionPoint = ConnectedJunctionSurface->JunctionPoints[BezierEdgePoints.EndJunctionID];
+
+	float FirstJunctionLength = FVector::Distance(JunctionStartPoint.Location, JunctionStartPoint.EndLocation);
+	float SecondJunctionLength = FVector::Distance(EndJunctionPoint.Location, EndJunctionPoint.EndLocation);
+
+	FVector StartPoint = CornerPointLocations[1] +  (ConnectedJunctionSurface->JunctionPoints[BezierEdgePoints.StartJunctionID].ForwardVector.GetSafeNormal() * FirstJunctionLength);
+	FVector EndPoint = CornerPointLocations[CornerPointLocations.Num() - 1] + (ConnectedJunctionSurface->JunctionPoints[BezierEdgePoints.EndJunctionID].ForwardVector.GetSafeNormal() * SecondJunctionLength);
+
+	//Interp Points
+	TArray<FVector> StartSidePointsArray = InsertPointsBetweenPositions(StartPoint, CornerPointLocations[1], 10);
+	TArray<FVector> EndSidePointsArray = InsertPointsBetweenPositions(CornerPointLocations[CornerPointLocations.Num() - 1], EndPoint, 10);
+
+	CornerPointLocations[0] = StartPoint;
+	CornerPointLocations.Add(EndPoint);
+
+	//Rebuild Full Array
+	TArray<FVector> AllPoints = TArray<FVector>();
+
+	AllPoints.Append(StartSidePointsArray);
+	CornerPointLocations.RemoveAt(CornerPointLocations.Num() - 1);
+	CornerPointLocations.RemoveAt(0);
+	AllPoints.Append(CornerPointLocations);
+	AllPoints.Append(EndSidePointsArray);
+
+	PrimaryEdgeSpline->SetSplinePoints(AllPoints, ESplineCoordinateSpace::World, false);
+	RebuildCustomTangentsFromPoints(AllPoints, PrimaryEdgeSpline);
+	PrimaryEdgeSpline->UpdateSpline();
+
+
+	bHandled = true;
+	return bHandled;
 }
 
 void ASidewalkSurface::InitialiseSideWalkProperties()
@@ -137,6 +203,7 @@ void ASidewalkSurface::InitialiseSideWalkProperties()
 	if (ConnectedSurface.IsA(AJunctionSurface::StaticClass()))
 	{
 		SideWalkGenerationType = ESideWalkGenerationType::JUNCTION;
+		ConnectedJunctionSurface = Cast<AJunctionSurface>(ConnectedSurface);
 	}
 
 	if (ConnectedSurface.IsA(ARoadSurface::StaticClass()))
@@ -172,6 +239,7 @@ void ASidewalkSurface::RebuildSideWalkGeometry()
 	TArray<int> TriangleIndices = BuildTriangleIndices(LengthResolution, WidthResolution, LeftRightFlip);
 
 	SidewalkPrimarySurface->CreateMeshSection(0, SideWalkBuffer.Location, TriangleIndices, SideWalkBuffer.Normal, SideWalkBuffer.UV, TArray<FColor>(), TArray<FProcMeshTangent>(), true);
+	SidewalkPrimarySurface->SetMaterial(0,Material);
 
 	//Debug Draw
 	DebugDrawPositions = SideWalkBuffer.Location;
@@ -186,12 +254,43 @@ void ASidewalkSurface::RebuildSideWalkGeometry()
 	}
 }
 
+//MATHS UTILTIES MOVE THIS OUT
+void ASidewalkSurface::RebuildCustomTangentsFromPoints(TArray<FVector> InPointLocations, USplineComponent* InSplineComponent)
+{
+	for (int i = 0; i < InPointLocations.Num() - 1; i++)
+	{
+		FVector NewTangent = InPointLocations[i + 1] - InPointLocations[i];
+		InSplineComponent->SetTangentAtSplinePoint(i, NewTangent.GetSafeNormal(), ESplineCoordinateSpace::World, false);
+	}
+}
+
+
+TArray<FVector> ASidewalkSurface::InsertPointsBetweenPositions(FVector InStartPoint, FVector InEndPoint, int InResolution)
+{
+	TArray<FVector> OutPositions;
+
+	const float Step = 1.0 / InResolution;
+
+	for (int i = 0; i < InResolution + 1; i++)
+	{
+		OutPositions.Add(FMath::Lerp(InStartPoint, InEndPoint, i * Step));
+	}
+
+	return OutPositions;
+}
+
+//MESH UTILITIES MOVE THIS OUT
 FVertexBufferSimple ASidewalkSurface::BuildMeshGridFromSpline(USplineComponent* InSplineComponent, int InXResolution, int InYResolution, float OffsetY, bool ToggleLeftRight, float InWidth)
 {
 	const float Width = ToggleLeftRight ? InWidth : -InWidth;
 
 	const float XStepValue = InSplineComponent->GetSplineLength() / InXResolution;
 	const float YStepValue = Width / InYResolution;
+
+	const float UVXStep = 1.0f / InXResolution;
+	const float UVYStep = 1.0f / InYResolution;
+	const float UVLength = 1.0 / InSplineComponent->GetSplineLength();
+	const float UVRatio = InSplineComponent->GetSplineLength() / InWidth;
 
 	FVertexBufferSimple ReturnVertexBuffer = FVertexBufferSimple();
 
@@ -207,9 +306,9 @@ FVertexBufferSimple ASidewalkSurface::BuildMeshGridFromSpline(USplineComponent* 
 		{
 			FVector PointAlongWidth = SplineStartPoint + (InSplineComponent->GetRightVectorAtDistanceAlongSpline(XStepValue * i, ESplineCoordinateSpace::World) * (j * YStepValue));
 
-			Locations.Add(PointAlongWidth  - this->GetActorLocation());
+			Locations.Add((PointAlongWidth + FVector(0.0f, 0.0f, SideWalkHeight))  - this->GetActorLocation());
 			Normals.Add(FVector(0, 0, 1));
-			UVs.Add(FVector2D(XStepValue * i, YStepValue * j));
+			UVs.Add(FVector2D((UVXStep * i) * UVRatio, UVYStep * j));
 		}
 	}
 

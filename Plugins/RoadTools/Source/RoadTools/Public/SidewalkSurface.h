@@ -79,7 +79,7 @@ public:
 	bool GetRoadSurfaceEdge();
 
 	UFUNCTION()
-	void GetJunctionEdge();
+	bool GetJunctionSurfaceEdge();
 
 	UFUNCTION(CallInEditor)
 	void InitialiseSideWalkProperties();
@@ -94,10 +94,14 @@ public:
 	UFUNCTION()
 	TArray<int> BuildTriangleIndices(int InXResolution, int InYResolution, bool ReverseWindingOrder);
 
+	UFUNCTION() //Move to utilities later
+	TArray<FVector> InsertPointsBetweenPositions(FVector InStartPoint, FVector InEndPoint, int InResolution);
+
+	UFUNCTION() //Move this to utilities later
+	void RebuildCustomTangentsFromPoints(TArray<FVector> InPointLocations, USplineComponent* InSplineComponent);
+	
 	UPROPERTY(VisibleAnywhere)
 	TArray<FVector> DebugDrawPositions;
-
-
 
 protected:
 
@@ -105,20 +109,32 @@ protected:
 
 public:	
 
-	UPROPERTY(EditAnywhere)
+
+	UPROPERTY(EditAnywhere) //Show Only When Road Surface
 	ESideWalkGenerationSide SideWalkGenerationSide = ESideWalkGenerationSide::LEFT;
 	 
 	UPROPERTY(EditAnywhere)
+	int JunctionSideID = 0;
+
+	UPROPERTY(EditAnywhere)
 	TObjectPtr<AActor> ConnectedSurface;
+
+	//Move all this to DataAsset later <-- so we can just create presets!
 
 	UPROPERTY(EditAnywhere)
 	float SideWalkWidth = 300.0f; //Make Array Later
+
+	UPROPERTY(EditAnywhere)
+	float SideWalkHeight = 20.0f; //Make Array Later
 
 	UPROPERTY(EditAnywhere)
 	int WidthResolution = 2;
 
 	UPROPERTY(EditAnywhere)
 	int LengthResolution = 10;
+
+	UPROPERTY(EditAnywhere)
+	TObjectPtr<UMaterialInstance> Material;
 
 	//Automatic Hidden Properties
 	UPROPERTY(VisibleAnywhere)
@@ -127,6 +143,8 @@ public:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<ARoadSurface> ConnectedRoadSurface;
 
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<AJunctionSurface> ConnectedJunctionSurface;
 
 
 };

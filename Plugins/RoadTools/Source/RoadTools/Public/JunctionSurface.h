@@ -164,7 +164,6 @@ struct FTurningLaneConnections
 	{
 
 	}
-
 };
 
 USTRUCT()
@@ -186,7 +185,6 @@ struct FBezierCornerPoints
 	FBezierCornerPoints()
 	{
 	}
-
 };
 
 USTRUCT() //DEP
@@ -258,7 +256,6 @@ struct FLaneCenterLinePoints
 		ForwardVector = FVector(1, 0, 0);
 		RightVector = FVector(0, 1, 0);
 	}
-
 };
 
 //These are Points that come from the Road Manager
@@ -475,6 +472,22 @@ struct FJunctionData
 		JunctionType = int(0);
 		SectionCenterPosition = FVector(0, 0, 0);
 	}
+};
+
+
+USTRUCT()
+struct FBoundaryPoints
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere)
+	TArray<FVector> Location;
+
+	UPROPERTY(VisibleAnywhere)
+	int SideID;
+
+	FBoundaryPoints()
+	{};
 
 };
 
@@ -483,7 +496,6 @@ class ROADTOOLS_API AJunctionSurface : public AActor
 {
 	GENERATED_BODY()
 	
-
 public:	
 
 	AJunctionSurface();
@@ -597,6 +609,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 private:
+
 	UPROPERTY(EditAnywhere)
 	UProceduralMeshComponent* JunctionSurface;
 	UPROPERTY(EditAnywhere)
@@ -611,7 +624,6 @@ private:
 	TObjectPtr<UJunctionSurfaceComponent> JunctionComponent;
 
 public:
-
 
 	//User Editor Properties (Manual Creation Mode)
 	UPROPERTY(EditAnywhere)
@@ -657,7 +669,6 @@ public:
 	TArray<FCapPoints> JunctionCenterLineEndPoint;
 	UPROPERTY()
 	TArray<FJunctionTurningLane> TurningLanes; //Should we keep a reference to our ALaneSpline here?
-
 
 	UPROPERTY(EditAnywhere)
 	UMaterialInterface* JunctionSurfaceMaterial;
